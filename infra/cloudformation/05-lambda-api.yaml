@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Okiteru - Lambda & API Gateway Layer'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: Environment name
+
+  LambdaS3Bucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment package
+
+  LambdaS3Key:
+    Type: String
+    Default: lambda/okiteru-api-latest.zip
+    Description: S3 key for Lambda deployment package
+
+  LambdaMemorySize:
+    Type: Number
+    Default: 512
+    MinValue: 128
+    MaxValue: 10240
+    Description: Lambda memory size in MB
+
+  LambdaTimeout:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 900
+    Description: Lambda timeout in seconds
+
+Resources:
+  # IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-okiteru-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+              # Secrets Manager
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-db-secret-arn
+              # S3 (Photos bucket)
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - Fn::Sub:
+                      - ${BucketArn}/*
+                      - BucketArn:
+                          Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-photos-bucket-arn
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-photos-bucket-arn
+
+  # Lambda Function
+  ApiLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${EnvironmentName}-okiteru-api
+      Runtime: python3.11
+      Handler: lambda_handler.handler
+      Code:
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaS3Key
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          DB_SECRET_ARN:
+            Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-db-secret-arn
+          S3_PHOTOS_BUCKET:
+            Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-photos-bucket-name
+          COGNITO_USER_POOL_ID:
+            Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-user-pool-id
+          COGNITO_CLIENT_ID:
+            Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-user-pool-client-id
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-lambda-sg-id
+        SubnetIds:
+          - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-private-subnet-1-id
+          - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-private-subnet-2-id
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-api
+
+  # Lambda Function URL (Alternative to API Gateway for simpler setup)
+  # ApiLambdaFunctionUrl:
+  #   Type: AWS::Lambda::Url
+  #   Properties:
+  #     TargetFunctionArn: !GetAtt ApiLambdaFunction.Arn
+  #     AuthType: NONE
+  #     Cors:
+  #       AllowOrigins:
+  #         - '*'
+  #       AllowMethods:
+  #         - '*'
+  #       AllowHeaders:
+  #         - '*'
+  #       MaxAge: 300
+
+  # Lambda Permission for Function URL
+  # ApiLambdaFunctionUrlPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     FunctionName: !Ref ApiLambdaFunction
+  #     Action: lambda:InvokeFunctionUrl
+  #     Principal: '*'
+  #     FunctionUrlAuthType: NONE
+
+  # CloudWatch Log Group
+  ApiLambdaLogGroup:
+    Type: AWS::CloudWatch::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ApiLambdaFunction}
+      RetentionInDays: 30
+
+  # API Gateway REST API
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${EnvironmentName}-okiteru-api
+      Description: Okiteru REST API
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Gateway Authorizer (Cognito)
+  ApiAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: CognitoAuthorizer
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref RestApi
+      ProviderARNs:
+        - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-user-pool-arn
+
+  # API Gateway Resource (Proxy)
+  ProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: '{proxy+}'
+
+  # API Gateway Method (ANY)
+  ProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      # AuthorizationType: COGNITO_USER_POOLS
+      # AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations
+
+  # API Gateway Method (Root ANY)
+  RootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !GetAtt RestApi.RootResourceId
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ProxyMethod
+      - RootMethod
+    Properties:
+      RestApiId: !Ref RestApi
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: !Ref EnvironmentName
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      MethodSettings:
+        - ResourcePath: /*
+          HttpMethod: '*'
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+          MetricsEnabled: true
+      Variables:
+        environment: !Ref EnvironmentName
+
+  # Lambda Permission for API Gateway
+  ApiGatewayInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*
+
+  # CloudWatch Log Group for API Gateway
+  ApiGatewayLogGroup:
+    Type: AWS::CloudWatch::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/apigateway/${RestApi}
+      RetentionInDays: 30
+
+Outputs:
+  ApiLambdaFunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt ApiLambdaFunction.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-lambda-arn
+
+  ApiLambdaFunctionName:
+    Description: Lambda Function Name
+    Value: !Ref ApiLambdaFunction
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-lambda-name
+
+  RestApiId:
+    Description: REST API ID
+    Value: !Ref RestApi
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-api-id
+
+  RestApiUrl:
+    Description: REST API Endpoint URL
+    Value: !Sub https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-api-url
+
+  # ApiLambdaFunctionUrl:
+  #   Description: Lambda Function URL
+  #   Value: !GetAtt ApiLambdaFunctionUrl.FunctionUrl
+  #   Export:
+  #     Name: !Sub ${EnvironmentName}-okiteru-lambda-url

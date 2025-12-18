@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Okiteru - Database Layer (RDS PostgreSQL)'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: Environment name
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedValues:
+      - db.t4g.micro
+      - db.t4g.small
+      - db.t4g.medium
+      - db.r6g.large
+    Description: RDS instance type
+
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 1000
+    Description: Allocated storage in GB
+
+  DBName:
+    Type: String
+    Default: okiteru
+    Description: Database name
+
+  DBUsername:
+    Type: String
+    Default: okiteru_admin
+    NoEcho: false
+    Description: Database master username
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Database master password (minimum 8 characters)
+
+  BackupRetentionPeriod:
+    Type: Number
+    Default: 7
+    MinValue: 0
+    MaxValue: 35
+    Description: Backup retention period in days
+
+Resources:
+  # DB Subnet Group
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub ${EnvironmentName}-okiteru-db-subnet-group
+      DBSubnetGroupDescription: Subnet group for Okiteru RDS
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-private-subnet-1-id
+        - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-private-subnet-2-id
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-db-subnet-group
+
+  # DB Parameter Group
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: postgres16
+      Description: PostgreSQL 16 parameter group for Okiteru
+      Parameters:
+        shared_preload_libraries: pg_stat_statements
+        log_statement: all
+        log_min_duration_statement: 1000
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-db-params
+
+  # RDS Instance
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub ${EnvironmentName}-okiteru-db
+      DBName: !Ref DBName
+      Engine: postgres
+      EngineVersion: '16.3'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBParameterGroupName: !Ref DBParameterGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-rds-sg-id
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      EnableCloudwatchLogsExports:
+        - postgresql
+      DeletionProtection: !If [IsProduction, true, false]
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-db
+
+  # Secrets Manager for DB Credentials
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${EnvironmentName}/okiteru/database
+      Description: Database credentials for Okiteru
+      SecretString: !Sub |
+        {
+          "username": "${DBUsername}",
+          "password": "${DBPassword}",
+          "engine": "postgres",
+          "host": "${DBInstance.Endpoint.Address}",
+          "port": ${DBInstance.Endpoint.Port},
+          "dbname": "${DBName}"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-db-secret
+
+  # Secret Rotation (Optional - requires Lambda function)
+  # SecretRotationSchedule:
+  #   Type: AWS::SecretsManager::RotationSchedule
+  #   Properties:
+  #     SecretId: !Ref DBSecret
+  #     RotationLambdaARN: !GetAtt SecretRotationLambda.Arn
+  #     RotationRules:
+  #       AutomaticallyAfterDays: 30
+
+Conditions:
+  IsProduction: !Equals [!Ref EnvironmentName, production]
+
+Outputs:
+  DBInstanceEndpoint:
+    Description: RDS instance endpoint
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-db-endpoint
+
+  DBInstancePort:
+    Description: RDS instance port
+    Value: !GetAtt DBInstance.Endpoint.Port
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-db-port
+
+  DBName:
+    Description: Database name
+    Value: !Ref DBName
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-db-name
+
+  DBSecretArn:
+    Description: ARN of the database credentials secret
+    Value: !Ref DBSecret
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-db-secret-arn
+
+  DBInstanceIdentifier:
+    Description: RDS instance identifier
+    Value: !Ref DBInstance
+    Export:
+      Name: !Sub ${EnvironmentName}-okiteru-db-id
