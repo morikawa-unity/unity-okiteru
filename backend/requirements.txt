@@ -2,6 +2,7 @@
 fastapi==0.118.0
 uvicorn[standard]==0.24.0
 python-multipart==0.0.20
+mangum==0.17.0
 
 # Database
 sqlalchemy==2.0.43
