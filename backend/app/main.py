@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import previous_day_reports
+from app.routers import previous_day_reports, users
 
 # FastAPIアプリケーションの作成
 app = FastAPI(
@@ -26,6 +26,7 @@ app.add_middleware(
 )
 
 # ルーターの登録
+app.include_router(users.router)
 app.include_router(previous_day_reports.router)
 
 

@@ -1,140 +1,206 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/router';
-import { User, LoginCredentials } from '@/types/user';
-import { api } from '@/lib/api';
-import { STORAGE_KEYS, ROUTES } from '@/lib/constants';
+/**
+ * 認証Context
+ */
+'use client';
 
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  CognitoUser,
+  CognitoUserSession,
+  AuthenticationDetails,
+} from 'amazon-cognito-identity-js';
+import { userPool } from '@/lib/cognito';
+
+// ユーザー型定義
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
+// 認証Context型定義
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
+  getIdToken: () => Promise<string | null>;
+  getCurrentSession: () => Promise<CognitoUserSession | null>;
 }
 
+// Context作成
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Provider Props
 interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * 認証Provider
+ */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-
-  const isAuthenticated = !!user;
 
   /**
-   * ローカルストレージからユーザー情報を読み込み
+   * 現在のセッションを取得
+   */
+  const getCurrentSession = async (): Promise<CognitoUserSession | null> => {
+    return new Promise((resolve) => {
+      const cognitoUser = userPool.getCurrentUser();
+
+      if (!cognitoUser) {
+        resolve(null);
+        return;
+      }
+
+      cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+        if (err || !session || !session.isValid()) {
+          resolve(null);
+          return;
+        }
+
+        resolve(session);
+      });
+    });
+  };
+
+  /**
+   * IDトークンを取得
+   */
+  const getIdToken = async (): Promise<string | null> => {
+    const session = await getCurrentSession();
+    return session ? session.getIdToken().getJwtToken() : null;
+  };
+
+  /**
+   * ログイン処理
+   */
+  const login = async (email: string, password: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const authenticationDetails = new AuthenticationDetails({
+        Username: email,
+        Password: password,
+      });
+
+      const cognitoUser = new CognitoUser({
+        Username: email,
+        Pool: userPool,
+      });
+
+      cognitoUser.authenticateUser(authenticationDetails, {
+        onSuccess: (session: CognitoUserSession) => {
+          // IDトークンからユーザー情報を取得
+          const idToken = session.getIdToken();
+          const payload = idToken.payload;
+
+          const userData: User = {
+            id: payload.sub,
+            email: payload.email,
+            name: payload.name || payload.email,
+            role: payload['cognito:groups']?.[0] || 'staff',
+          };
+
+          setUser(userData);
+          setIsAuthenticated(true);
+
+          // LocalStorageに保存（オプション）
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          resolve();
+        },
+        onFailure: (err: Error) => {
+          console.error('Login error:', err);
+          reject(err);
+        },
+        newPasswordRequired: (userAttributes: any) => {
+          // 初回ログイン時のパスワード変更が必要な場合
+          console.log('New password required:', userAttributes);
+          reject(new Error('新しいパスワードの設定が必要です'));
+        },
+      });
+    });
+  };
+
+  /**
+   * ログアウト処理
+   */
+  const logout = () => {
+    const cognitoUser = userPool.getCurrentUser();
+    if (cognitoUser) {
+      cognitoUser.signOut();
+    }
+
+    setUser(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem('user');
+  };
+
+  /**
+   * 初期化：セッションチェック
    */
   useEffect(() => {
-    const loadUser = () => {
+    const checkAuth = async () => {
       try {
-        const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+        const session = await getCurrentSession();
 
-        if (token && savedUser) {
-          setUser(JSON.parse(savedUser));
+        if (session && session.isValid()) {
+          const idToken = session.getIdToken();
+          const payload = idToken.payload;
+
+          const userData: User = {
+            id: payload.sub,
+            email: payload.email,
+            name: payload.name || payload.email,
+            role: payload['cognito:groups']?.[0] || 'staff',
+          };
+
+          setUser(userData);
+          setIsAuthenticated(true);
+          localStorage.setItem('user', JSON.stringify(userData));
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+          localStorage.removeItem('user');
         }
       } catch (error) {
-        console.error('Failed to load user from localStorage:', error);
-        localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.USER);
+        console.error('Auth check error:', error);
+        setUser(null);
+        setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadUser();
+    checkAuth();
   }, []);
 
-  /**
-   * ログイン
-   */
-  const login = async (credentials: LoginCredentials) => {
-    try {
-      // TODO: 実際のAPI呼び出しに置き換え
-      // const response = await api.post<{ user: User; token: string }>('/api/auth/login', credentials);
-
-      // モックデータ（開発用）
-      const mockUser: User = {
-        id: '1',
-        email: credentials.email,
-        name: 'テストユーザー',
-        role: 'staff',
-        active: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const mockToken = 'mock-jwt-token';
-
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, mockToken);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mockUser));
-      setUser(mockUser);
-
-      // ロールに応じてリダイレクト
-      if (mockUser.role === 'manager') {
-        router.push(ROUTES.MANAGER.HOME);
-      } else {
-        router.push(ROUTES.DASHBOARD.ATTENDANCE);
-      }
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
+  const value: AuthContextType = {
+    user,
+    isAuthenticated,
+    isLoading,
+    login,
+    logout,
+    getIdToken,
+    getCurrentSession,
   };
 
-  /**
-   * ログアウト
-   */
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    setUser(null);
-    router.push(ROUTES.LOGIN);
-  };
-
-  /**
-   * ユーザー情報を再取得
-   */
-  const refreshUser = async () => {
-    try {
-      // TODO: 実際のAPI呼び出しに置き換え
-      // const userData = await api.get<User>('/api/users/me');
-      // localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
-      // setUser(userData);
-    } catch (error) {
-      console.error('Failed to refresh user:', error);
-      logout();
-    }
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated,
-        isLoading,
-        login,
-        logout,
-        refreshUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 /**
- * 認証コンテキストを使用するフック
+ * useAuth Hook
  */
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };

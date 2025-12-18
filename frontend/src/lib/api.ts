@@ -1,6 +1,30 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_URL, STORAGE_KEYS } from './constants';
 import type { ApiResponse, ApiError } from '@/types/api';
+import { userPool } from './cognito';
+
+/**
+ * Cognito IDトークンを取得
+ */
+const getCognitoIdToken = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    const cognitoUser = userPool.getCurrentUser();
+
+    if (!cognitoUser) {
+      resolve(null);
+      return;
+    }
+
+    cognitoUser.getSession((err: Error | null, session: any) => {
+      if (err || !session || !session.isValid()) {
+        resolve(null);
+        return;
+      }
+
+      resolve(session.getIdToken().getJwtToken());
+    });
+  });
+};
 
 /**
  * Axios インスタンス作成
@@ -16,16 +40,12 @@ const createApiClient = (): AxiosInstance => {
 
   // リクエストインターセプター（認証トークン追加）
   instance.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    async (config) => {
+      // Cognito IDトークンを取得して付与
+      const token = await getCognitoIdToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-
-      // 開発用: X-User-Idヘッダーを追加（本番ではCognitoトークンから取得）
-      // 既存のテストユーザーIDを使用
-      const userId = localStorage.getItem(STORAGE_KEYS.USER_ID) || '86160ddc-ff66-4435-a6e7-bdfd1c30e44a';
-      config.headers['X-User-Id'] = userId;
 
       return config;
     },
@@ -38,8 +58,14 @@ const createApiClient = (): AxiosInstance => {
     async (error) => {
       if (error.response?.status === 401) {
         // 認証エラー時の処理
-        localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER);
+
+        // Cognitoからもログアウト
+        const cognitoUser = userPool.getCurrentUser();
+        if (cognitoUser) {
+          cognitoUser.signOut();
+        }
+
         window.location.href = '/login';
       }
       return Promise.reject(error);
