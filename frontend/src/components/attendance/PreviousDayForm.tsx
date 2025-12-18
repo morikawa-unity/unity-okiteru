@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { usePreviousDayReportCreate } from '@/hooks/usePreviousDayReport';
 
 interface PreviousDayFormProps {
   onSuccess?: () => void;
@@ -15,27 +16,55 @@ export const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) =
   });
   const [appearancePhoto, setAppearancePhoto] = useState<File | null>(null);
   const [routePhoto, setRoutePhoto] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const createMutation = usePreviousDayReportCreate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+
+    if (!appearancePhoto || !routePhoto) {
+      alert('写真を選択してください');
+      return;
+    }
 
     try {
-      // TODO: 実際のAPI呼び出し
-      console.log('前日報告データ:', formData);
-      console.log('身だしなみ写真:', appearancePhoto);
-      console.log('経路写真:', routePhoto);
+      // TODO: S3へのアップロード実装
+      // 現在は仮のURLを使用
+      const appearancePhotoUrl = `temp://${appearancePhoto.name}`;
+      const routePhotoUrl = `temp://${routePhoto.name}`;
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // 今日の日付を報告日として使用
+      const today = new Date().toISOString().split('T')[0];
+
+      // 時刻を HH:MM:SS 形式に変換（HTMLのinput[type="time"]はHH:MM形式）
+      const formatTime = (time: string) => time.length === 5 ? `${time}:00` : time;
+
+      await createMutation.mutateAsync({
+        reportDate: today,
+        nextWakeUpTime: formatTime(formData.nextWakeUpTime),
+        nextDepartureTime: formatTime(formData.nextDepartureTime),
+        nextArrivalTime: formatTime(formData.nextArrivalTime),
+        appearancePhotoUrl,
+        routePhotoUrl,
+        notes: formData.notes || undefined,
+      });
 
       alert('前日報告を送信しました！');
+
+      // フォームをリセット
+      setFormData({
+        nextWakeUpTime: '',
+        nextDepartureTime: '',
+        nextArrivalTime: '',
+        notes: '',
+      });
+      setAppearancePhoto(null);
+      setRoutePhoto(null);
+
       onSuccess?.();
     } catch (error) {
       console.error('前日報告エラー:', error);
       alert('前日報告の送信に失敗しました');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -134,7 +163,7 @@ export const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) =
           />
         </div>
 
-        <Button type="submit" className="w-full" isLoading={isSubmitting}>
+        <Button type="submit" className="w-full" isLoading={createMutation.isPending}>
           前日報告を送信
         </Button>
       </form>

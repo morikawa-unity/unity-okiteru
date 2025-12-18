@@ -21,6 +21,12 @@ const createApiClient = (): AxiosInstance => {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // 開発用: X-User-Idヘッダーを追加（本番ではCognitoトークンから取得）
+      // 既存のテストユーザーIDを使用
+      const userId = localStorage.getItem(STORAGE_KEYS.USER_ID) || '86160ddc-ff66-4435-a6e7-bdfd1c30e44a';
+      config.headers['X-User-Id'] = userId;
+
       return config;
     },
     (error) => Promise.reject(error)

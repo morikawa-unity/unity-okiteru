@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'okiteru_access_token',
   REFRESH_TOKEN: 'okiteru_refresh_token',
   USER: 'okiteru_user',
+  USER_ID: 'okiteru_user_id',
 } as const;
 
 /**
