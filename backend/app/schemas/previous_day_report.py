@@ -66,7 +66,7 @@ class PreviousDayReportResponse(BaseModel):
     appearance_photo_url: str
     route_photo_url: str
     notes: str | None
-    actual_attendance_record_id: uuid.UUID | None
+    # actual_attendance_record_id: uuid.UUID | None  # 将来実装予定
     created_at: datetime
     updated_at: datetime
 
@@ -83,7 +83,6 @@ class PreviousDayReportResponse(BaseModel):
                 "appearance_photo_url": "https://s3.amazonaws.com/okiteru-photos/appearance/12345.jpg",
                 "route_photo_url": "https://s3.amazonaws.com/okiteru-photos/route/12345.jpg",
                 "notes": "特になし",
-                "actual_attendance_record_id": None,
                 "created_at": "2025-12-17T20:00:00Z",
                 "updated_at": "2025-12-17T20:00:00Z",
             }

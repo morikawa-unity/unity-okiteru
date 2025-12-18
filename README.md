@@ -198,6 +198,8 @@ alembic upgrade head
 python scripts/seed_data.py
 ```
 
+より詳細な手順やトラブルシューティングについては、[ローカルデータベース環境構築ガイド](docs/LOCAL_DATABASE_SETUP.md)を参照してください。
+
 ---
 
 ## 開発
@@ -304,6 +306,7 @@ aws lambda update-function-code \
 | [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) | データベース設計、テーブル定義、ER図 |
 | [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | ディレクトリ構成、ファイル役割、命名規則 |
 | [REQUIREMENTS.md](docs/REQUIREMENTS.md) | 機能要件、非機能要件、API仕様 |
+| [LOCAL_DATABASE_SETUP.md](docs/LOCAL_DATABASE_SETUP.md) | ローカルDB環境の構築手順とマイグレーションガイド |
 | [CLAUDE.md](CLAUDE.md) | Claude Code向け開発ガイド |
 
 ---

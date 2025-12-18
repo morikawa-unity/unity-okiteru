@@ -4,8 +4,8 @@
 import uuid
 from datetime import date, time, datetime
 
-from sqlalchemy import Column, String, Text, Date, Time, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, TIMESTAMPTZ
+from sqlalchemy import Column, String, Text, Date, Time, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -41,19 +41,19 @@ class PreviousDayReport(Base):
     # 備考
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # 実際の出勤記録ID（FK）
-    actual_attendance_record_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("attendance_records.id", ondelete="SET NULL"),
-        nullable=True,
-    )
+    # 実際の出勤記録ID（FK）- 将来実装予定
+    # actual_attendance_record_id: Mapped[uuid.UUID | None] = mapped_column(
+    #     UUID(as_uuid=True),
+    #     ForeignKey("attendance_records.id", ondelete="SET NULL"),
+    #     nullable=True,
+    # )
 
     # タイムスタンプ
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMPTZ, nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
     updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMPTZ, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     # リレーションシップ（必要に応じて後で追加）
