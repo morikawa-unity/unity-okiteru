@@ -231,7 +231,8 @@ cd backend
 source venv/bin/activate
 
 # 開発サーバー起動
-uvicorn app.main:app --reload
+# uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # Lint & Format
 black app/ tests/
