@@ -108,8 +108,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(userData);
           setIsAuthenticated(true);
 
-          // LocalStorageに保存（オプション）
-          localStorage.setItem('user', JSON.stringify(userData));
+          // sessionStorageに保存（タブを閉じると自動削除）
+          sessionStorage.setItem('user', JSON.stringify(userData));
 
           resolve();
         },
@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
   };
 
   /**
@@ -161,11 +161,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           setUser(userData);
           setIsAuthenticated(true);
-          localStorage.setItem('user', JSON.stringify(userData));
+          sessionStorage.setItem('user', JSON.stringify(userData));
         } else {
           setUser(null);
           setIsAuthenticated(false);
-          localStorage.removeItem('user');
+          sessionStorage.removeItem('user');
         }
       } catch (error) {
         console.error('Auth check error:', error);

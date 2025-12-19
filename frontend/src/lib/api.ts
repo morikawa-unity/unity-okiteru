@@ -58,7 +58,7 @@ const createApiClient = (): AxiosInstance => {
     async (error) => {
       if (error.response?.status === 401) {
         // 認証エラー時の処理
-        localStorage.removeItem(STORAGE_KEYS.USER);
+        sessionStorage.removeItem(STORAGE_KEYS.USER);
 
         // Cognitoからもログアウト
         const cognitoUser = userPool.getCurrentUser();

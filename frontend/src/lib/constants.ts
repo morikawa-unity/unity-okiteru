@@ -4,7 +4,8 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
- * ローカルストレージキー
+ * sessionStorageキー
+ * セキュリティ向上のため、localStorageではなくsessionStorageを使用
  */
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'okiteru_access_token',
