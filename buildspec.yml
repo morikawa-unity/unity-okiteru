@@ -14,6 +14,10 @@ env:
     COGNITO_CLIENT_ID: /okiteru/${ENV}/cognito-client-id
     S3_BUCKET_NAME: /okiteru/${ENV}/s3-bucket-name
     LAMBDA_FUNCTION_NAME: /okiteru/${ENV}/lambda-function-name
+    CLOUDFRONT_DISTRIBUTION_ID: /okiteru/${ENV}/cloudfront-distribution-id
+    API_URL: /okiteru/${ENV}/api-url
+    PHOTOS_BUCKET_NAME: /okiteru/${ENV}/photos-bucket-name
+    PHOTOS_BUCKET_URL: /okiteru/${ENV}/photos-bucket-url
 
 phases:
   install:
@@ -57,6 +61,13 @@ phases:
       # フロントエンド - ビルド
       - echo "Frontend - Building..."
       - cd ../frontend
+      # 環境変数をビルド時に設定
+      - |
+        echo "NEXT_PUBLIC_API_URL=${API_URL}" > .env.production
+        echo "NEXT_PUBLIC_COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}" >> .env.production
+        echo "NEXT_PUBLIC_COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}" >> .env.production
+        echo "NEXT_PUBLIC_PHOTOS_BUCKET_URL=${PHOTOS_BUCKET_URL}" >> .env.production
+        echo "NEXT_PUBLIC_ENVIRONMENT=${ENV}" >> .env.production
       - npm run build
       - echo "Frontend build completed"
 
@@ -77,11 +88,9 @@ phases:
       - echo "Frontend deployed to S3: s3://${S3_BUCKET_NAME}"
 
       # CloudFront キャッシュ無効化
-      - |
-        if [ ! -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
-          echo "Invalidating CloudFront cache..."
-          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
-        fi
+      - echo "Invalidating CloudFront cache..."
+      - aws cloudfront create-invalidation --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} --paths "/*"
+      - echo "CloudFront cache invalidated"
 
       # バックエンド - Lambdaへデプロイ
       - echo "Backend - Deploying to Lambda..."
@@ -98,6 +107,7 @@ phases:
             COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID},
             COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID},
             S3_BUCKET_NAME=${S3_BUCKET_NAME},
+            PHOTOS_BUCKET_NAME=${PHOTOS_BUCKET_NAME},
             ENVIRONMENT=${ENV}
           }"
 
