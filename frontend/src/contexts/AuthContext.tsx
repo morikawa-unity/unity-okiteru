@@ -1,5 +1,10 @@
 /**
  * 認証Context
+ *
+ * セキュリティ設計:
+ * - ユーザー情報はReact stateでのみ管理（sessionStorageへの重複保存はしない）
+ * - Cognitoが内部的にsessionStorageでトークン/セッション管理
+ * - データの一元管理により、不整合や削除漏れのリスクを低減
  */
 'use client';
 
@@ -108,9 +113,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(userData);
           setIsAuthenticated(true);
 
-          // sessionStorageに保存（タブを閉じると自動削除）
-          sessionStorage.setItem('user', JSON.stringify(userData));
-
           resolve();
         },
         onFailure: (err: Error) => {
@@ -137,7 +139,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setUser(null);
     setIsAuthenticated(false);
-    sessionStorage.removeItem('user');
   };
 
   /**
@@ -161,11 +162,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           setUser(userData);
           setIsAuthenticated(true);
-          sessionStorage.setItem('user', JSON.stringify(userData));
         } else {
           setUser(null);
           setIsAuthenticated(false);
-          sessionStorage.removeItem('user');
         }
       } catch (error) {
         console.error('Auth check error:', error);

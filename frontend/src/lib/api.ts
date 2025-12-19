@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { API_URL, STORAGE_KEYS } from './constants';
+import { API_URL } from './constants';
 import type { ApiResponse, ApiError } from '@/types/api';
 import { userPool } from './cognito';
 
@@ -57,10 +57,7 @@ const createApiClient = (): AxiosInstance => {
     (response) => response,
     async (error) => {
       if (error.response?.status === 401) {
-        // 認証エラー時の処理
-        sessionStorage.removeItem(STORAGE_KEYS.USER);
-
-        // Cognitoからもログアウト
+        // 認証エラー時の処理 - Cognitoセッションをクリア
         const cognitoUser = userPool.getCurrentUser();
         if (cognitoUser) {
           cognitoUser.signOut();
