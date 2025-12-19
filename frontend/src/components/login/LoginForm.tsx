@@ -3,16 +3,7 @@
  * プレゼンテーショナルコンポーネント（UIのみ、ロジックなし）
  */
 import React from 'react';
-
-export interface LoginFormProps {
-  email: string;
-  password: string;
-  error: string | null;
-  isLoading: boolean;
-  onEmailChange: (email: string) => void;
-  onPasswordChange: (password: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-}
+import type { LoginFormProps } from '@/types/login';
 
 export const LoginForm: React.FC<LoginFormProps> = ({
   email,
@@ -36,10 +27,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               メールアドレス
             </label>
             <input
@@ -55,10 +43,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               パスワード
             </label>
             <input
