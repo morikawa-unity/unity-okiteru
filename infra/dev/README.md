@@ -56,12 +56,13 @@
 |---------|--------|------|------|
 | **VPC** | 10.0.0.0/16 | ネットワーク基盤 | パブリック×2、プライベート×2 サブネット |
 | **RDS** | PostgreSQL 15.5 | データベース | db.t3.micro, 20GB, 7日バックアップ |
-| **Cognito** | User Pool | ユーザー認証 | メール認証、パスワードポリシー設定済み |
-| **S3** | Bucket | フロントエンド保存 | プライベート、CloudFrontからのみアクセス |
+| **Cognito** | User Pool | ユーザー認証 | メール認証、User Groups (staff/manager) |
+| **S3** | Bucket (Frontend) | フロントエンド保存 | プライベート、CloudFrontからのみアクセス |
+| **S3** | Bucket (Photos) | 画像保存 | パブリック、写真アップロード用 |
 | **CloudFront** | Distribution | CDN配信 | HTTPSアクセス、グローバル配信 |
 | **API Gateway** | REST API | APIエンドポイント | Lambda統合、CORS設定済み |
-| **Lambda** | Python 3.11 | バックエンドAPI | VPC内配置、RDSアクセス |
-| **IAM** | Role | Lambda実行ロール | SSM、Cognito、VPCアクセス権限 |
+| **Lambda** | Python 3.11 | バックエンドAPI | VPC内配置、RDS/S3アクセス |
+| **IAM** | Role | Lambda実行ロール | SSM、Cognito、VPC、S3アクセス権限 |
 
 ### ネットワーク構成
 
@@ -119,13 +120,36 @@
 
 ## セットアップ手順
 
+すべてのステップを順番に実行してください：
+
+```bash
+cd infra/dev
+
+# ステップ1: インフラデプロイ（15-20分）
+./deploy.sh
+
+# ステップ2: Parameter Store設定（1分）
+./setup-parameters.sh
+
+# ステップ3: データベース初期化（2-3分）
+./init-database.sh
+
+# ステップ3.5: テストユーザー作成（1分）
+./init-cognito.sh
+
+# ステップ4-5: GitHub Token設定とCodePipelineデプロイ
+# （後述の手順を参照）
+```
+
+---
+
 ### ステップ1: インフラのデプロイ
 
 CloudFormationスタックをデプロイし、AWSリソースを作成します。
 
 ```bash
 cd infra/dev
-chmod +x *.sh
+chmod +x *.sh  # 全スクリプトに実行権限を付与
 ./deploy.sh
 ```
 
@@ -210,6 +234,29 @@ Alembicマイグレーションを実行し、テーブルを作成します。
 4. テーブル作成（users, attendance_records, shifts, reports等）
 
 **所要時間:** 約2-3分
+
+### ステップ3.5: Cognitoテストユーザーの作成
+
+開発用のテストユーザーを作成します。
+
+```bash
+./init-cognito.sh
+```
+
+**実行内容:**
+1. Parameter StoreからCognito User Pool IDを取得
+2. テストユーザーを作成（スタッフ×2、マネージャー×1）
+3. ユーザーをグループに追加
+
+**作成されるユーザー:**
+
+| メールアドレス | パスワード | ロール | 用途 |
+|--------------|-----------|--------|------|
+| staff1@example.com | TestPass123! | staff | スタッフユーザー1 |
+| staff2@example.com | TestPass123! | staff | スタッフユーザー2 |
+| manager1@example.com | TestPass123! | manager | マネージャーユーザー |
+
+**所要時間:** 約1分
 
 ### ステップ4: GitHub Tokenの設定
 
@@ -347,11 +394,11 @@ aws cloudformation describe-stacks \
 **作成されるリソース:**
 - VPC、Subnet、Route Table、Internet Gateway
 - RDS PostgreSQL インスタンス
-- Cognito User Pool と Client
-- S3 Bucket（プライベート、CloudFrontからのみアクセス）
+- Cognito User Pool、Client、User Groups (staff/manager)
+- S3 Bucket × 2（フロントエンド：プライベート、画像：パブリック）
 - CloudFront Distribution（CDN、HTTPS対応）
 - API Gateway REST API（Lambda統合）
-- Lambda Function（VPC内配置）
+- Lambda Function（VPC内配置、S3/RDSアクセス権限）
 - IAM Role（Lambda実行ロール）
 - Security Group（DB用、Lambda用）
 
@@ -392,6 +439,27 @@ aws cloudformation describe-stacks \
 - reports - 日報
 - worksites - 現場情報
 - その他、Alembicマイグレーションで定義されたテーブル
+
+### init-cognito.sh
+
+**目的**: 開発用のテストユーザーを作成
+
+**処理フロー:**
+1. Parameter StoreからCognito User Pool IDを取得
+2. テストユーザーを作成（admin-create-user）
+3. パスワードを永続化（初回ログイン不要）
+4. ユーザーをグループ（staff/manager）に追加
+
+**作成されるユーザー:**
+- staff1@example.com - スタッフユーザー1
+- staff2@example.com - スタッフユーザー2
+- manager1@example.com - マネージャーユーザー
+
+**パスワード:** すべて `TestPass123!`
+
+**注意:**
+- 既にユーザーが存在する場合はスキップされます
+- 本番環境では使用しないでください（開発環境専用）
 
 ## 確認方法
 
@@ -565,7 +633,36 @@ aws ssm delete-parameters \
   --region ap-northeast-1
 ```
 
-### 5. GitHub Tokenの削除（オプション）
+### 5. Cognitoテストユーザーの削除（オプション）
+
+```bash
+# User Pool IDを取得
+USER_POOL_ID=$(aws ssm get-parameter \
+  --name /okiteru/dev/cognito-user-pool-id \
+  --query 'Parameter.Value' \
+  --output text \
+  --region ap-northeast-1)
+
+# テストユーザーを削除
+aws cognito-idp admin-delete-user \
+  --user-pool-id ${USER_POOL_ID} \
+  --username staff1@example.com \
+  --region ap-northeast-1
+
+aws cognito-idp admin-delete-user \
+  --user-pool-id ${USER_POOL_ID} \
+  --username staff2@example.com \
+  --region ap-northeast-1
+
+aws cognito-idp admin-delete-user \
+  --user-pool-id ${USER_POOL_ID} \
+  --username manager1@example.com \
+  --region ap-northeast-1
+```
+
+> **注意**: CloudFormationスタックを削除すればUser Poolごと削除されるため、個別削除は通常不要です。
+
+### 6. GitHub Tokenの削除（オプション）
 
 ```bash
 aws secretsmanager delete-secret \

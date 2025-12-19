@@ -228,6 +228,23 @@ Resources:
         IdToken: hours
         RefreshToken: days
 
+  # Cognito User Groups
+  CognitoUserGroupStaff:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: staff
+      Description: Staff users group
+      UserPoolId: !Ref CognitoUserPool
+      Precedence: 1
+
+  CognitoUserGroupManager:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: manager
+      Description: Manager users group
+      UserPoolId: !Ref CognitoUserPool
+      Precedence: 0
+
   # S3 Bucket for Frontend (Private - CloudFront only)
   FrontendBucket:
     Type: AWS::S3::Bucket
