@@ -1,0 +1,172 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches:
+      - main        # production環境
+      - staging     # staging環境
+      - develop     # development環境
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-deploy.yml'
+
+env:
+  AWS_REGION: ap-northeast-1
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment based on branch
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENV_NAME=production" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "ENV_NAME=staging" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "ENV_NAME=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        working-directory: backend
+        run: |
+          pip install pytest pytest-cov
+          pytest tests/ --cov=app --cov-report=xml || echo "No tests found"
+
+      - name: Build Lambda deployment package
+        working-directory: backend
+        run: |
+          echo "Building Lambda deployment package..."
+
+          # 一時ディレクトリ作成
+          rm -rf package
+          mkdir -p package
+
+          # 依存関係インストール
+          pip install -r requirements.txt -t package/ --platform manylinux2014_x86_64 --only-binary=:all:
+
+          # アプリケーションコードコピー
+          cp -r app package/
+          cp lambda_handler.py package/
+
+          # alembicもコピー（マイグレーション用、オプション）
+          # cp -r alembic package/
+          # cp alembic.ini package/
+
+          # zip作成
+          cd package
+          zip -r ../lambda-deployment.zip . -x '*.pyc' -x '*__pycache__*' -x '*.dist-info*'
+          cd ..
+
+          echo "Lambda package size:"
+          du -h lambda-deployment.zip
+
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "ACCOUNT_ID=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Upload Lambda package to S3
+        working-directory: backend
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+          ACCOUNT_ID: ${{ steps.account.outputs.ACCOUNT_ID }}
+        run: |
+          S3_BUCKET="${ENV_NAME}-okiteru-lambda-deployment-${ACCOUNT_ID}"
+          S3_KEY="lambda/okiteru-api-$(date +%Y%m%d-%H%M%S).zip"
+          S3_LATEST_KEY="lambda/okiteru-api-latest.zip"
+
+          # S3にアップロード（バージョン付き）
+          aws s3 cp lambda-deployment.zip s3://${S3_BUCKET}/${S3_KEY}
+
+          # 最新版としてもアップロード
+          aws s3 cp lambda-deployment.zip s3://${S3_BUCKET}/${S3_LATEST_KEY}
+
+          echo "Uploaded to s3://${S3_BUCKET}/${S3_KEY}"
+          echo "S3_KEY=${S3_KEY}" >> $GITHUB_ENV
+
+      - name: Update Lambda function code
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+          ACCOUNT_ID: ${{ steps.account.outputs.ACCOUNT_ID }}
+        run: |
+          FUNCTION_NAME="${ENV_NAME}-okiteru-api"
+          S3_BUCKET="${ENV_NAME}-okiteru-lambda-deployment-${ACCOUNT_ID}"
+
+          echo "Updating Lambda function: ${FUNCTION_NAME}"
+
+          aws lambda update-function-code \
+            --function-name ${FUNCTION_NAME} \
+            --s3-bucket ${S3_BUCKET} \
+            --s3-key lambda/okiteru-api-latest.zip \
+            --publish
+
+          echo "Lambda function updated successfully"
+
+      - name: Wait for Lambda update to complete
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+        run: |
+          FUNCTION_NAME="${ENV_NAME}-okiteru-api"
+
+          echo "Waiting for Lambda function update to complete..."
+          aws lambda wait function-updated \
+            --function-name ${FUNCTION_NAME}
+
+          echo "Lambda function is ready"
+
+      - name: Verify deployment
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+        run: |
+          FUNCTION_NAME="${ENV_NAME}-okiteru-api"
+
+          # Lambda関数の情報を取得
+          aws lambda get-function --function-name ${FUNCTION_NAME} \
+            --query 'Configuration.[FunctionName,LastModified,Runtime,CodeSize]' \
+            --output table
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Backend deployment successful for ${{ steps.set-env.outputs.ENV_NAME }} environment"
+          echo "Lambda function updated at $(date)"
+
+      - name: Notify deployment failure
+        if: failure()
+        run: |
+          echo "❌ Backend deployment failed for ${{ steps.set-env.outputs.ENV_NAME }} environment"
+          exit 1

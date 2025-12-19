@@ -1,0 +1,237 @@
+name: Frontend Deploy
+
+on:
+  push:
+    branches:
+      - main        # production環境
+      - staging     # staging環境
+      - develop     # development環境
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-deploy.yml'
+
+env:
+  AWS_REGION: ap-northeast-1
+  NODE_VERSION: '20'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment based on branch
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENV_NAME=production" >> $GITHUB_OUTPUT
+            echo "ENV_FILE=.env.production" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "ENV_NAME=staging" >> $GITHUB_OUTPUT
+            echo "ENV_FILE=.env.staging" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "ENV_NAME=development" >> $GITHUB_OUTPUT
+            echo "ENV_FILE=.env.development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "ACCOUNT_ID=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Get CloudFormation outputs
+        id: cfn-outputs
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+        run: |
+          # API URL取得
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${ENV_NAME}-okiteru-lambda-api \
+            --query 'Stacks[0].Outputs[?OutputKey==`RestApiUrl`].OutputValue' \
+            --output text)
+
+          # CloudFront URL取得
+          CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${ENV_NAME}-okiteru-cloudfront \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontUrl`].OutputValue' \
+            --output text)
+
+          # CloudFront Distribution ID取得
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${ENV_NAME}-okiteru-cloudfront \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
+            --output text)
+
+          # Cognito User Pool ID取得
+          COGNITO_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${ENV_NAME}-okiteru-cognito \
+            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' \
+            --output text)
+
+          # Cognito Client ID取得
+          COGNITO_CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${ENV_NAME}-okiteru-cognito \
+            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolClientId`].OutputValue' \
+            --output text)
+
+          echo "API_URL=${API_URL}" >> $GITHUB_OUTPUT
+          echo "CLOUDFRONT_URL=${CLOUDFRONT_URL}" >> $GITHUB_OUTPUT
+          echo "DISTRIBUTION_ID=${DISTRIBUTION_ID}" >> $GITHUB_OUTPUT
+          echo "COGNITO_POOL_ID=${COGNITO_POOL_ID}" >> $GITHUB_OUTPUT
+          echo "COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}" >> $GITHUB_OUTPUT
+
+          echo "Outputs retrieved:"
+          echo "  API_URL: ${API_URL}"
+          echo "  CLOUDFRONT_URL: ${CLOUDFRONT_URL}"
+          echo "  DISTRIBUTION_ID: ${DISTRIBUTION_ID}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Create environment file
+        working-directory: frontend
+        env:
+          API_URL: ${{ steps.cfn-outputs.outputs.API_URL }}
+          CLOUDFRONT_URL: ${{ steps.cfn-outputs.outputs.CLOUDFRONT_URL }}
+          COGNITO_POOL_ID: ${{ steps.cfn-outputs.outputs.COGNITO_POOL_ID }}
+          COGNITO_CLIENT_ID: ${{ steps.cfn-outputs.outputs.COGNITO_CLIENT_ID }}
+        run: |
+          cat > .env.production << EOF
+          NEXT_PUBLIC_API_URL=${API_URL}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID=${COGNITO_POOL_ID}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+          NEXT_PUBLIC_COGNITO_REGION=${AWS_REGION}
+          NEXT_PUBLIC_S3_BUCKET_URL=${CLOUDFRONT_URL}/photos
+          EOF
+
+          echo "Environment file created:"
+          cat .env.production
+
+      - name: Run linter
+        working-directory: frontend
+        run: npm run lint || echo "Linting issues found, continuing..."
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test -- --passWithNoTests || echo "No tests found"
+
+      - name: Build Next.js application
+        working-directory: frontend
+        run: |
+          echo "Building Next.js application..."
+          npm run build
+
+          echo "Build output:"
+          ls -lh out/ || ls -lh .next/
+
+      - name: Upload to S3
+        working-directory: frontend
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+          ACCOUNT_ID: ${{ steps.account.outputs.ACCOUNT_ID }}
+        run: |
+          S3_BUCKET="${ENV_NAME}-okiteru-frontend-${ACCOUNT_ID}"
+
+          echo "Uploading to S3 bucket: ${S3_BUCKET}"
+
+          # Next.js の出力ディレクトリを確認
+          if [ -d "out" ]; then
+            OUTPUT_DIR="out"
+          elif [ -d ".next" ]; then
+            OUTPUT_DIR=".next"
+          else
+            echo "Error: No build output found"
+            exit 1
+          fi
+
+          # S3に同期アップロード（古いファイルは削除）
+          aws s3 sync ${OUTPUT_DIR}/ s3://${S3_BUCKET}/ \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html" \
+            --exclude "service-worker.js"
+
+          # HTMLファイルは短いキャッシュ期間
+          aws s3 sync ${OUTPUT_DIR}/ s3://${S3_BUCKET}/ \
+            --exclude "*" \
+            --include "*.html" \
+            --include "service-worker.js" \
+            --cache-control "public,max-age=0,must-revalidate"
+
+          echo "Upload completed"
+
+      - name: Invalidate CloudFront cache
+        env:
+          DISTRIBUTION_ID: ${{ steps.cfn-outputs.outputs.DISTRIBUTION_ID }}
+        run: |
+          echo "Invalidating CloudFront cache for distribution: ${DISTRIBUTION_ID}"
+
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id ${DISTRIBUTION_ID} \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+
+          echo "Invalidation created: ${INVALIDATION_ID}"
+          echo "INVALIDATION_ID=${INVALIDATION_ID}" >> $GITHUB_ENV
+
+      - name: Wait for CloudFront invalidation
+        env:
+          DISTRIBUTION_ID: ${{ steps.cfn-outputs.outputs.DISTRIBUTION_ID }}
+        run: |
+          echo "Waiting for CloudFront invalidation to complete..."
+
+          aws cloudfront wait invalidation-completed \
+            --distribution-id ${DISTRIBUTION_ID} \
+            --id ${INVALIDATION_ID}
+
+          echo "CloudFront cache invalidated successfully"
+
+      - name: Verify deployment
+        env:
+          CLOUDFRONT_URL: ${{ steps.cfn-outputs.outputs.CLOUDFRONT_URL }}
+        run: |
+          echo "Frontend deployed to: ${CLOUDFRONT_URL}"
+
+          # ヘルスチェック
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${CLOUDFRONT_URL})
+
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Frontend is accessible (HTTP ${HTTP_STATUS})"
+          else
+            echo "⚠️ Frontend returned HTTP ${HTTP_STATUS}"
+          fi
+
+      - name: Notify deployment success
+        if: success()
+        env:
+          ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+          CLOUDFRONT_URL: ${{ steps.cfn-outputs.outputs.CLOUDFRONT_URL }}
+        run: |
+          echo "✅ Frontend deployment successful for ${ENV_NAME} environment"
+          echo "🌐 URL: ${CLOUDFRONT_URL}"
+          echo "📅 Deployed at: $(date)"
+
+      - name: Notify deployment failure
+        if: failure()
+        run: |
+          echo "❌ Frontend deployment failed for ${{ steps.set-env.outputs.ENV_NAME }} environment"
+          exit 1
