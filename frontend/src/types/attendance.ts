@@ -1,4 +1,6 @@
-export type AttendanceStatus = 'pending' | 'partial' | 'complete' | 'active' | 'reset' | 'reopened' | 'archived';
+import { AttendanceStatus } from '@/lib/enums';
+
+export type { AttendanceStatus };
 
 export interface AttendanceRecord {
   id: string;

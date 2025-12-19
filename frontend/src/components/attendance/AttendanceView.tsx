@@ -9,8 +9,9 @@ import { Button } from '@/components/common/Button';
 import { PreviousDayForm } from '@/components/attendance/PreviousDayForm';
 import { AttendanceRecord } from '@/types/attendance';
 import { formatDate } from '@/utils/date';
+import { ActionType } from '@/lib/enums';
 
-export type ActionType = 'previous-day' | 'wakeup' | 'departure' | 'arrival' | 'report';
+export type { ActionType };
 
 export interface ActionStatus {
   type: ActionType;
@@ -84,7 +85,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       )}
 
       {/* 前日報告フォーム */}
-      {activeAction === 'previous-day' && (
+      {activeAction === ActionType.PREVIOUS_DAY && (
         <div className="mb-6">
           <PreviousDayForm onSuccess={onPreviousDaySuccess} />
           <Button variant="outline" onClick={onCancelPreviousDay} className="w-full mt-3">

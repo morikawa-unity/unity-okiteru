@@ -1,4 +1,6 @@
-export type ReportStatus = 'draft' | 'submitted' | 'archived' | 'superseded';
+import { ReportStatus } from '@/lib/enums';
+
+export type { ReportStatus };
 
 export interface DailyReport {
   id: string;

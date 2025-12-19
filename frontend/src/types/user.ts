@@ -1,4 +1,6 @@
-export type UserRole = 'staff' | 'manager';
+import { UserRole } from '@/lib/enums';
+
+export type { UserRole };
 
 export interface User {
   id: string;

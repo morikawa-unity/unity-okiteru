@@ -8,11 +8,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
 import { AttendanceRecord } from '@/types/attendance';
 import { formatDate } from '@/utils/date';
-import {
-  AttendanceView,
-  ActionType,
-  ActionStatus,
-} from '@/components/attendance/AttendanceView';
+import { ActionType, AttendanceStatus } from '@/lib/enums';
+import { AttendanceView, ActionStatus } from '@/components/attendance/AttendanceView';
 
 export const AttendanceContainer: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -37,7 +34,7 @@ export const AttendanceContainer: React.FC = () => {
         id: '1',
         staffId: user.id,
         date: formatDate(new Date(), 'yyyy-MM-dd'),
-        status: 'pending',
+        status: AttendanceStatus.PENDING,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -58,7 +55,7 @@ export const AttendanceContainer: React.FC = () => {
 
     return [
       {
-        type: 'previous-day',
+        type: ActionType.PREVIOUS_DAY,
         label: '前日報告',
         activeLabel: '前日報告を入力',
         completed: previousDayCompleted,
@@ -66,7 +63,7 @@ export const AttendanceContainer: React.FC = () => {
         description: '翌日の予定時刻と準備状況を報告',
       },
       {
-        type: 'wakeup',
+        type: ActionType.WAKEUP,
         label: '起床報告',
         activeLabel: '起床報告を送信',
         completed: wakeupCompleted,
@@ -74,7 +71,7 @@ export const AttendanceContainer: React.FC = () => {
         description: '起床時刻を報告',
       },
       {
-        type: 'departure',
+        type: ActionType.DEPARTURE,
         label: '出発報告',
         activeLabel: '出発報告を送信',
         completed: departureCompleted,
@@ -82,7 +79,7 @@ export const AttendanceContainer: React.FC = () => {
         description: '自宅を出発した時刻を報告',
       },
       {
-        type: 'arrival',
+        type: ActionType.ARRIVAL,
         label: '到着報告',
         activeLabel: '到着報告を送信',
         completed: arrivalCompleted,
@@ -90,7 +87,7 @@ export const AttendanceContainer: React.FC = () => {
         description: '現場に到着した時刻を報告',
       },
       {
-        type: 'report',
+        type: ActionType.REPORT,
         label: '日報作成',
         activeLabel: '日報を作成',
         completed: reportCompleted,
@@ -115,7 +112,7 @@ export const AttendanceContainer: React.FC = () => {
       const updatedRecord: AttendanceRecord = {
         ...currentRecord,
         wakeUpTime: now,
-        status: 'partial',
+        status: AttendanceStatus.PARTIAL,
       };
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -141,7 +138,7 @@ export const AttendanceContainer: React.FC = () => {
       const updatedRecord: AttendanceRecord = {
         ...currentRecord,
         departureTime: now,
-        status: 'partial',
+        status: AttendanceStatus.PARTIAL,
       };
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -167,7 +164,7 @@ export const AttendanceContainer: React.FC = () => {
       const updatedRecord: AttendanceRecord = {
         ...currentRecord,
         arrivalTime: now,
-        status: 'complete',
+        status: AttendanceStatus.COMPLETE,
       };
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -190,15 +187,15 @@ export const AttendanceContainer: React.FC = () => {
   const handleActionClick = (action: ActionStatus) => {
     if (!action.enabled || action.completed) return;
 
-    if (action.type === 'previous-day') {
-      setActiveAction('previous-day');
-    } else if (action.type === 'wakeup') {
+    if (action.type === ActionType.PREVIOUS_DAY) {
+      setActiveAction(ActionType.PREVIOUS_DAY);
+    } else if (action.type === ActionType.WAKEUP) {
       handleWakeUp();
-    } else if (action.type === 'departure') {
+    } else if (action.type === ActionType.DEPARTURE) {
       handleDeparture();
-    } else if (action.type === 'arrival') {
+    } else if (action.type === ActionType.ARRIVAL) {
       handleArrival();
-    } else if (action.type === 'report') {
+    } else if (action.type === ActionType.REPORT) {
       handleNavigateToReport();
     }
   };

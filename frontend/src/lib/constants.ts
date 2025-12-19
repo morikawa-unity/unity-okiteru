@@ -49,21 +49,12 @@ export const ROUTES = {
 
 /**
  * 勤怠ステータスラベル
+ * @deprecated enums.tsのAttendanceStatusLabelを使用してください
  */
-export const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
-  pending: '未報告',
-  partial: '一部報告',
-  complete: '報告完了',
-  active: 'アクティブ',
-  reset: 'リセット',
-  reopened: '再開',
-  archived: 'アーカイブ',
-};
+export { AttendanceStatusLabel as ATTENDANCE_STATUS_LABELS } from './enums';
 
 /**
  * ロールラベル
+ * @deprecated enums.tsのUserRoleLabelを使用してください
  */
-export const ROLE_LABELS: Record<string, string> = {
-  staff: 'スタッフ',
-  manager: 'マネージャー',
-};
+export { UserRoleLabel as ROLE_LABELS } from './enums';

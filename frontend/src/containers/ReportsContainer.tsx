@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
+import { ReportStatus } from '@/lib/enums';
 import { ReportsView, Report } from '@/components/reports/ReportsView';
 
 export const ReportsContainer: React.FC = () => {
@@ -21,14 +22,14 @@ export const ReportsContainer: React.FC = () => {
       id: '1',
       date: '2025-12-17',
       content: '渋谷現場での作業を実施。配線工事を完了しました。',
-      status: 'submitted',
+      status: ReportStatus.SUBMITTED,
       submittedAt: '2025-12-17T18:30:00Z',
     },
     {
       id: '2',
       date: '2025-12-16',
       content: '新宿現場の点検業務を実施。異常なし。',
-      status: 'submitted',
+      status: ReportStatus.SUBMITTED,
       submittedAt: '2025-12-16T17:00:00Z',
     },
   ]);
