@@ -8,40 +8,13 @@
  */
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import {
-  CognitoUser,
-  CognitoUserSession,
-  AuthenticationDetails,
-} from 'amazon-cognito-identity-js';
+import React, { createContext, useState, useEffect } from 'react';
+import { CognitoUser, CognitoUserSession, AuthenticationDetails } from 'amazon-cognito-identity-js';
 import { userPool } from '@/lib/cognito';
-
-// ユーザー型定義
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-}
-
-// 認証Context型定義
-export interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  getIdToken: () => Promise<string | null>;
-  getCurrentSession: () => Promise<CognitoUserSession | null>;
-}
+import type { User, AuthContextType, AuthProviderProps } from '@/types/auth';
 
 // Context作成
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Provider Props
-interface AuthProviderProps {
-  children: ReactNode;
-}
 
 /**
  * 認証Provider

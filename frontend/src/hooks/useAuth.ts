@@ -4,21 +4,7 @@
  */
 import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import type { User } from '@/contexts/AuthContext';
-import type { CognitoUserSession } from 'amazon-cognito-identity-js';
-
-/**
- * 認証Context型定義
- */
-export interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  getIdToken: () => Promise<string | null>;
-  getCurrentSession: () => Promise<CognitoUserSession | null>;
-}
+import type { AuthContextType } from '@/types/auth';
 
 /**
  * 認証状態を取得するフック
