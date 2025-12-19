@@ -41,22 +41,22 @@ Okiteru アプリケーションの AWS インフラストラクチャを CloudF
 ### 開発環境セットアップ（初回のみ）
 
 ```bash
-cd infra
+cd infra/cloudformation
 
 # 1. スクリプトに実行権限付与
-chmod +x *.sh
+chmod +x shell/*.sh
 
 # 2. インフラデプロイ（15-20分）
-./deploy.sh --env development
+./shell/deploy.sh --env development
 
 # 3. Parameter Store設定（1分）
-./setup-parameters.sh --env development
+./shell/setup-parameters.sh --env development
 
 # 4. データベース初期化（2-3分）
-./init-database.sh --env development
+./shell/init-database.sh --env development
 
 # 5. テストユーザー作成（1分）
-./init-cognito.sh --env development
+./shell/init-cognito.sh --env development
 
 # 6. CI/CDは既にセットアップ済み（07-codepipelineスタック）
 ```
@@ -65,34 +65,38 @@ chmod +x *.sh
 
 ```bash
 # Staging
-./deploy.sh --env staging
-./setup-parameters.sh --env staging
-./init-database.sh --env staging
-./init-cognito.sh --env staging
+./shell/deploy.sh --env staging
+./shell/setup-parameters.sh --env staging
+./shell/init-database.sh --env staging
+./shell/init-cognito.sh --env staging
 
 # Production
-./deploy.sh --env production
-./setup-parameters.sh --env production
-./init-database.sh --env production
-./init-cognito.sh --env production
+./shell/deploy.sh --env production
+./shell/setup-parameters.sh --env production
+./shell/init-database.sh --env production
+./shell/init-cognito.sh --env production
 ```
 
 ## 📁 ファイル構成
 
 ```
 cloudformation/
-├── README.md                     # 本ファイル
-├── deploy.sh                     # インフラデプロイスクリプト
-├── setup-parameters.sh           # Parameter Store設定
-├── init-database.sh              # DB初期化（Alembicマイグレーション）
-├── init-cognito.sh               # テストユーザー作成
-├── cleanup.sh                    # 環境削除
+├── shell/                        # スクリプトディレクトリ
+│   ├── deploy.sh                 # インフラデプロイスクリプト
+│   ├── setup-parameters.sh       # Parameter Store設定
+│   ├── init-database.sh          # DB初期化（Alembicマイグレーション）
+│   ├── init-cognito.sh           # テストユーザー作成
+│   ├── cleanup.sh                # 環境削除
+│   ├── snapshot-save.sh          # RDSスナップショット保存
+│   ├── snapshot-restore.sh       # RDSスナップショット復元
+│   └── snapshot-list.sh          # スナップショット一覧表示
 ├── 01-network.yaml               # VPC, Subnets, SG
 ├── 02-database.yaml              # RDS PostgreSQL
 ├── 03-cognito.yaml               # Cognito User Pool
 ├── 04-storage.yaml               # S3 Buckets
 ├── 05-lambda-api.yaml            # Lambda + API Gateway
 ├── 06-cloudfront.yaml            # CloudFront Distribution
+├── 07-codepipeline.yaml          # CI/CD Pipeline
 ├── parameters-development.json   # Dev環境パラメータ
 ├── parameters-staging.json       # Staging環境パラメータ
 └── parameters-production.json    # Production環境パラメータ
@@ -105,7 +109,7 @@ cloudformation/
 全ての CloudFormation スタックをデプロイします。
 
 ```bash
-./deploy.sh --env <development|staging|production>
+./shell/deploy.sh --env <development|staging|production>
 ```
 
 **処理内容:**
@@ -122,7 +126,7 @@ cloudformation/
 CloudFormation の出力を Parameter Store に保存します。
 
 ```bash
-./setup-parameters.sh --env <development|staging|production>
+./shell/setup-parameters.sh --env <development|staging|production>
 ```
 
 **処理内容:**
@@ -146,7 +150,7 @@ CloudFormation の出力を Parameter Store に保存します。
 RDS データベースに Alembic マイグレーションを実行します。
 
 ```bash
-./init-database.sh --env <development|staging|production>
+./shell/init-database.sh --env <development|staging|production>
 ```
 
 **処理内容:**
@@ -163,7 +167,7 @@ RDS データベースに Alembic マイグレーションを実行します。
 Cognito にテストユーザーを作成します。
 
 ```bash
-./init-cognito.sh --env <development|staging|production>
+./shell/init-cognito.sh --env <development|staging|production>
 ```
 
 **処理内容:**
@@ -185,10 +189,10 @@ Cognito にテストユーザーを作成します。
 全てのインフラリソースを削除します。
 
 ```bash
-./cleanup.sh --env <development|staging|production>
+./shell/cleanup.sh --env <development|staging|production>
 
 # 確認をスキップ
-./cleanup.sh --env development --yes
+./shell/cleanup.sh --env development --yes
 ```
 
 **⚠️ 警告:** この操作は取り消せません！全てのデータが完全に削除されます。
@@ -201,6 +205,51 @@ Cognito にテストユーザーを作成します。
 - Parameter Store のパラメータを削除
 
 **所要時間:** 15-20 分（CloudFront 無効化に時間がかかる）
+
+### 6. snapshot-save.sh
+
+RDS インスタンスをスナップショット化して削除（コスト削減用）
+
+```bash
+./shell/snapshot-save.sh --env <development|staging|production>
+```
+
+**処理内容:**
+- RDS スナップショット作成（5-10分）
+- Parameter Store に保存
+- RDS インスタンス削除（5-10分）
+
+**所要時間:** 10-20分
+**コスト削減:** $15/月 → $1.9/月（約87%削減）
+
+### 7. snapshot-restore.sh
+
+スナップショットから RDS を復元
+
+```bash
+./shell/snapshot-restore.sh --env <development|staging|production>
+
+# 特定のスナップショットから復元
+./shell/snapshot-restore.sh --env development --snapshot-id okiteru-dev-snapshot-20251219
+```
+
+**処理内容:**
+- 最新スナップショット取得
+- スナップショットから復元（10-15分）
+- Parameter Store 更新
+- 接続テスト
+
+**所要時間:** 10-15分
+
+### 8. snapshot-list.sh
+
+スナップショット一覧とコスト表示
+
+```bash
+./shell/snapshot-list.sh --env <development|staging|production>
+```
+
+詳細は [RDS スナップショット管理ガイド](../docs/RDS_SNAPSHOT_MANAGEMENT.md) を参照。
 
 ## 🌍 環境別パラメータ
 
@@ -369,13 +418,13 @@ aws rds describe-db-instances \
 
 ```bash
 # 全削除
-./cleanup.sh --env development --yes
+./shell/cleanup.sh --env development --yes
 
 # 再デプロイ
-./deploy.sh --env development
-./setup-parameters.sh --env development
-./init-database.sh --env development
-./init-cognito.sh --env development
+./shell/deploy.sh --env development
+./shell/setup-parameters.sh --env development
+./shell/init-database.sh --env development
+./shell/init-cognito.sh --env development
 ```
 
 ## 📚 次のステップ
