@@ -1,6 +1,6 @@
 # Okiteru（おきてる）- スタッフ勤怠・日報管理システム
 
-通信事業部向けのスタッフ管理システム。日々の勤怠管理（起床・出発・到着報告）と日報管理を効率化し、マネージャーがスタッフの状況をリアルタイムで把握できるWebアプリケーション。
+通信事業部向けのスタッフ管理システム。日々の勤怠管理（起床・出発・到着報告）と日報管理を効率化し、マネージャーがスタッフの状況をリアルタイムで把握できる Web アプリケーション。
 
 ---
 
@@ -22,15 +22,18 @@
 ## 概要
 
 ### プロジェクト名
+
 **Okiteru（おきてる）** - スタッフ勤怠・日報管理システム
 
 ### 目的
+
 - スタッフの日々の勤怠状況（起床・出発・到着）をリアルタイムで可視化
 - 前日報告による翌日の予定把握と準備
 - 日報の提出促進と一元管理
 - マネージャーの管理業務効率化
 
 ### 対象ユーザー
+
 - **スタッフ**: 勤怠報告、日報提出、スケジュール登録
 - **マネージャー**: スタッフ管理、勤怠・日報閲覧、現場マスタ管理
 
@@ -39,12 +42,14 @@
 ## 主な機能
 
 ### スタッフ機能
+
 - ✅ **前日報告**: 翌日の予定（起床・出発・到着時刻）、身だしなみ写真、経路スクリーンショットの登録
 - ✅ **当日勤怠報告**: 起床・出発・到着の時刻、場所、備考、写真の記録
 - ✅ **日報作成・提出**: 当日の作業内容を日報として記録・提出
 - ✅ **出社可能日登録**: 出勤予定をカレンダー形式で登録
 
 ### マネージャー機能
+
 - ✅ **ダッシュボード**: 全スタッフの勤怠状況を一覧表示、未報告・遅延の強調表示
 - ✅ **スタッフ管理**: スタッフ一覧、詳細情報、勤怠・日報履歴の閲覧
 - ✅ **スケジュール管理**: 全スタッフの出社可能日をカレンダー形式で表示
@@ -55,34 +60,37 @@
 ## 技術スタック
 
 ### インフラストラクチャ（AWS）
-| サービス | 用途 |
-|---------|------|
-| **CloudFront** | CDN、静的ファイル配信 |
-| **S3** | 静的ファイル、画像保存 |
-| **API Gateway** | REST APIエンドポイント |
-| **Lambda** | サーバーレス処理（FastAPI） |
-| **RDS PostgreSQL** | データベース |
-| **Cognito** | 認証・認可 |
-| **CloudFormation** | IaC（インフラ管理） |
+
+| サービス           | 用途                        |
+| ------------------ | --------------------------- |
+| **CloudFront**     | CDN、静的ファイル配信       |
+| **S3**             | 静的ファイル、画像保存      |
+| **API Gateway**    | REST API エンドポイント     |
+| **Lambda**         | サーバーレス処理（FastAPI） |
+| **RDS PostgreSQL** | データベース                |
+| **Cognito**        | 認証・認可                  |
+| **CloudFormation** | IaC（インフラ管理）         |
 
 ### フロントエンド
-| 技術 | バージョン |
-|------|-----------|
-| React | 18.x |
-| Next.js | 14.x (Pages Router) |
-| TypeScript | 5.x |
-| Tailwind CSS | 3.x |
-| TanStack Query | 5.x |
-| Zod | 3.x |
+
+| 技術           | バージョン          |
+| -------------- | ------------------- |
+| React          | 18.x                |
+| Next.js        | 14.x (Pages Router) |
+| TypeScript     | 5.x                 |
+| Tailwind CSS   | 3.x                 |
+| TanStack Query | 5.x                 |
+| Zod            | 3.x                 |
 
 ### バックエンド
-| 技術 | バージョン |
-|------|-----------|
-| Python | 3.11+ |
-| FastAPI | 0.104+ |
-| SQLAlchemy | 2.0+ |
-| Pydantic | 2.x |
-| Alembic | 1.12+ |
+
+| 技術       | バージョン |
+| ---------- | ---------- |
+| Python     | 3.11+      |
+| FastAPI    | 0.104+     |
+| SQLAlchemy | 2.0+       |
+| Pydantic   | 2.x        |
+| Alembic    | 1.12+      |
 
 ---
 
@@ -140,17 +148,17 @@ unity-okiteru/
 │   ├── PROJECT_STRUCTURE.md      # プロジェクト構成
 │   └── REQUIREMENTS.md           # 要件定義書
 ├── infra/                        # インフラコード（CloudFormation）
-│   ├── dev/                      # 開発環境
-│   │   ├── infrastructure.yml    # インフラスタック
-│   │   ├── deploy.sh             # デプロイスクリプト
-│   │   ├── setup-parameters.sh   # Parameter Store設定
-│   │   ├── init-database.sh      # DB初期化
-│   │   ├── init-cognito.sh       # テストユーザー作成
-│   │   ├── cleanup.sh            # 環境削除
-│   │   └── README.md             # 開発環境セットアップガイド
-│   └── codepipeline/             # CI/CD（CodePipeline）
-│       ├── pipeline.yml
-│       └── README.md
+│   └── cloudformation/           # CloudFormation テンプレート
+│       ├── 01-network.yaml       # VPC、サブネット、セキュリティグループ
+│       ├── 02-database.yaml      # RDS PostgreSQL
+│       ├── 03-cognito.yaml       # Cognito User Pool
+│       ├── 04-storage.yaml       # S3バケット
+│       ├── 05-lambda-api.yaml    # Lambda、API Gateway
+│       ├── 06-cloudfront.yaml    # CloudFront Distribution
+│       ├── 07-codepipeline.yaml  # CI/CD Pipeline
+│       ├── deploy.sh             # デプロイスクリプト
+│       ├── parameters-*.json     # 環境別パラメータ
+│       └── README.md             # インフラ構築手順
 ├── frontend/                     # フロントエンドアプリケーション（Next.js）
 │   └── README.md                 # フロントエンド詳細
 ├── backend/                      # バックエンドアプリケーション（FastAPI）
@@ -158,17 +166,18 @@ unity-okiteru/
 └── buildspec.yml                 # CodeBuild設定
 ```
 
-詳細は各ディレクトリのREADMEを参照してください。
+詳細は各ディレクトリの README を参照してください。
 
 ---
 
 ## 環境構築
 
 ### 前提条件
-- **Node.js**: 18.x以上
-- **Python**: 3.11以上
-- **Docker**: 20.x以上（ローカル開発用）
-- **AWS CLI**: 2.x以上（デプロイ用）
+
+- **Node.js**: 18.x 以上
+- **Python**: 3.11 以上
+- **Docker**: 20.x 以上（ローカル開発用）
+- **AWS CLI**: 2.x 以上（デプロイ用）
 
 ### 1. リポジトリクローン
 
@@ -262,9 +271,10 @@ alembic revision -m "description"
 alembic upgrade head
 ```
 
-### APIドキュメント
+### API ドキュメント
 
 開発サーバー起動後、以下にアクセス:
+
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
@@ -273,15 +283,16 @@ alembic upgrade head
 ## デプロイ
 
 ### 前提条件
+
 - AWS アカウント
-- AWS CLI設定済み
+- AWS CLI 設定済み
 - CloudFormation スタック作成済み
 
 ### 1. インフラストラクチャデプロイ
 
 ```bash
-cd infra/dev
-./deploy.sh
+cd infra/cloudformation
+./deploy.sh --env development
 ```
 
 ### 2. フロントエンドデプロイ
@@ -306,24 +317,25 @@ aws lambda update-function-code \
   --zip-file fileb://../lambda.zip
 ```
 
-### CI/CD（GitHub Actions）
+### CI/CD（CodePipeline）
 
-- **開発環境**: `develop`ブランチへのpushで自動デプロイ
-- **ステージング**: `release`ブランチへのpushで自動デプロイ
-- **本番環境**: `main`ブランチへのpushまたはタグ作成で自動デプロイ
+- **開発環境**: `develop`ブランチへの push で自動デプロイ
+- **ステージング**: `staging`ブランチへの push で自動デプロイ
+- **本番環境**: `main`ブランチへの push で自動デプロイ（承認必須）
 
 ---
 
 ## ドキュメント
 
-| ドキュメント | 説明 |
-|------------|------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | システムアーキテクチャ、技術スタック、設計パターン |
-| [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) | データベース設計、テーブル定義、ER図 |
-| [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | ディレクトリ構成、ファイル役割、命名規則 |
-| [REQUIREMENTS.md](docs/REQUIREMENTS.md) | 機能要件、非機能要件、API仕様 |
-| [LOCAL_DATABASE_SETUP.md](docs/LOCAL_DATABASE_SETUP.md) | ローカルDB環境の構築手順とマイグレーションガイド |
-| [CLAUDE.md](CLAUDE.md) | Claude Code向け開発ガイド |
+| ドキュメント                                            | 説明                                               |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)                 | システムアーキテクチャ、技術スタック、設計パターン |
+| [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)           | データベース設計、テーブル定義、ER 図              |
+| [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)       | ディレクトリ構成、ファイル役割、命名規則           |
+| [REQUIREMENTS.md](docs/REQUIREMENTS.md)                 | 機能要件、非機能要件、API 仕様                     |
+| [LOCAL_DATABASE_SETUP.md](docs/LOCAL_DATABASE_SETUP.md) | ローカル DB 環境の構築手順とマイグレーションガイド |
+| [CICD_SETUP.md](docs/CICD_SETUP.md)                     | CI/CD（CodePipeline）セットアップガイド            |
+| [CLAUDE.md](CLAUDE.md)                                  | Claude Code 向け開発ガイド                         |
 
 ---
 
@@ -345,6 +357,7 @@ Proprietary - 社内利用専用
 ## サポート
 
 質問や問題がある場合は、以下にお問い合わせください:
+
 - **GitHub Issues**: https://github.com/your-org/unity-okiteru/issues
 - **Slack**: #okiteru-support
 

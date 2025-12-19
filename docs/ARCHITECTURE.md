@@ -3,13 +3,17 @@
 ## 1. システム概要
 
 ### 1.1 システム名
+
 **Okiteru（おきてる）** - スタッフ勤怠・日報管理システム
 
 ### 1.2 目的
+
 通信事業部向けのスタッフ管理システムで、日々の勤怠管理（起床・出発・到着報告）と日報管理を効率化し、マネージャーがスタッフの状況をリアルタイムで把握できるようにする。
 
 ### 1.3 主な機能
+
 - **スタッフ機能**
+
   - 前日報告（翌日の予定入力）
   - 当日勤怠報告（起床・出発・到着時刻、写真アップロード）
   - 日報作成・提出
@@ -63,17 +67,17 @@
     └──────────────────┘  └──────────────┘  └──────────────┘
 ```
 
-### 2.2 AWSサービス構成
+### 2.2 AWS サービス構成
 
-| サービス | 役割 | 詳細 |
-|---------|------|------|
-| **CloudFront** | CDN | Next.jsアプリケーションの静的ファイル配信、高速化 |
-| **S3** | ストレージ | フロントエンドの静的ファイル、勤怠写真の保存 |
-| **API Gateway** | APIエンドポイント | REST APIのエンドポイント管理、リクエストルーティング |
-| **Lambda** | サーバーレス処理 | FastAPI（Python）によるビジネスロジック実行 |
-| **RDS PostgreSQL** | データベース | ユーザー、勤怠、日報などのデータ永続化 |
-| **Cognito** | 認証/認可 | ユーザー認証、JWTトークン発行・検証 |
-| **CloudFormation** | IaC | インフラのコード管理（YAML） |
+| サービス           | 役割               | 詳細                                                  |
+| ------------------ | ------------------ | ----------------------------------------------------- |
+| **CloudFront**     | CDN                | Next.js アプリケーションの静的ファイル配信、高速化    |
+| **S3**             | ストレージ         | フロントエンドの静的ファイル、勤怠写真の保存          |
+| **API Gateway**    | API エンドポイント | REST API のエンドポイント管理、リクエストルーティング |
+| **Lambda**         | サーバーレス処理   | FastAPI（Python）によるビジネスロジック実行           |
+| **RDS PostgreSQL** | データベース       | ユーザー、勤怠、日報などのデータ永続化                |
+| **Cognito**        | 認証/認可          | ユーザー認証、JWT トークン発行・検証                  |
+| **CloudFormation** | IaC                | インフラのコード管理（YAML）                          |
 
 ### 2.3 デプロイフロー
 
@@ -88,12 +92,14 @@ GitHub Repository
 ```
 
 **CloudFormation テンプレート構成:**
-- `infrastructure/cloudformation/main.yml` - メインスタック
-- `infrastructure/cloudformation/network.yml` - VPC、サブネット
-- `infrastructure/cloudformation/database.yml` - RDS PostgreSQL
-- `infrastructure/cloudformation/api.yml` - API Gateway、Lambda
-- `infrastructure/cloudformation/frontend.yml` - S3、CloudFront
-- `infrastructure/cloudformation/auth.yml` - Cognito
+
+- `infra/cloudformation/01-network.yaml` - VPC、サブネット、セキュリティグループ
+- `infra/cloudformation/02-database.yaml` - RDS PostgreSQL
+- `infra/cloudformation/03-cognito.yaml` - Cognito User Pool
+- `infra/cloudformation/04-storage.yaml` - S3 バケット
+- `infra/cloudformation/05-lambda-api.yaml` - Lambda、API Gateway
+- `infra/cloudformation/06-cloudfront.yaml` - CloudFront Distribution
+- `infra/cloudformation/07-codepipeline.yaml` - CI/CD Pipeline
 
 ---
 
@@ -102,26 +108,28 @@ GitHub Repository
 ### 3.1 技術スタック
 
 #### フロントエンド
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| **React** | 18.x | UIフレームワーク |
-| **Next.js** | 14.x (Pages Router) | SSR、ルーティング |
-| **TypeScript** | 5.x | 型安全性 |
-| **Tailwind CSS** | 3.x | スタイリング |
-| **Zod** | 3.x | バリデーション |
-| **React Context** | - | 状態管理（クライアント側） |
-| **TanStack Query** | 5.x | サーバー状態管理、キャッシュ |
+
+| 技術               | バージョン          | 用途                         |
+| ------------------ | ------------------- | ---------------------------- |
+| **React**          | 18.x                | UI フレームワーク            |
+| **Next.js**        | 14.x (Pages Router) | SSR、ルーティング            |
+| **TypeScript**     | 5.x                 | 型安全性                     |
+| **Tailwind CSS**   | 3.x                 | スタイリング                 |
+| **Zod**            | 3.x                 | バリデーション               |
+| **React Context**  | -                   | 状態管理（クライアント側）   |
+| **TanStack Query** | 5.x                 | サーバー状態管理、キャッシュ |
 
 #### バックエンド
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| **Python** | 3.11+ | プログラミング言語 |
-| **FastAPI** | 0.104+ | Web フレームワーク |
-| **SQLAlchemy** | 2.0+ | ORM |
-| **Pydantic** | 2.x | バリデーション、スキーマ定義 |
-| **Alembic** | 1.12+ | マイグレーション管理 |
-| **psycopg2** | 2.9+ | PostgreSQLドライバ |
-| **boto3** | 1.34+ | AWS SDK（S3操作） |
+
+| 技術           | バージョン | 用途                         |
+| -------------- | ---------- | ---------------------------- |
+| **Python**     | 3.11+      | プログラミング言語           |
+| **FastAPI**    | 0.104+     | Web フレームワーク           |
+| **SQLAlchemy** | 2.0+       | ORM                          |
+| **Pydantic**   | 2.x        | バリデーション、スキーマ定義 |
+| **Alembic**    | 1.12+      | マイグレーション管理         |
+| **psycopg2**   | 2.9+       | PostgreSQL ドライバ          |
+| **boto3**      | 1.34+      | AWS SDK（S3 操作）           |
 
 ### 3.2 フロントエンド構成
 
@@ -250,26 +258,24 @@ backend/
 ### 4.2 状態管理（フロントエンド）
 
 #### クライアント状態 - React Context
+
 ```typescript
 // contexts/AuthContext.tsx
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>{children}</AuthContext.Provider>;
 };
 ```
 
 #### サーバー状態 - TanStack Query
+
 ```typescript
 // hooks/useAttendance.ts
 export const useAttendance = (date: string) => {
   return useQuery({
-    queryKey: ['attendance', date],
+    queryKey: ["attendance", date],
     queryFn: () => fetchAttendance(date),
     staleTime: 1000 * 60 * 5, // 5分間キャッシュ
   });
@@ -300,30 +306,32 @@ export const useAttendance = (date: string) => {
 
 ### 5.1 認証・認可
 
-| 項目 | 実装方法 |
-|------|---------|
-| **認証方式** | AWS Cognito + JWT |
-| **トークン保存** | LocalStorage (暗号化推奨) |
-| **トークン有効期限** | 1時間（リフレッシュトークン: 30日） |
-| **API認可** | JWTトークン検証（全エンドポイント） |
-| **ロールベース制御** | `staff` / `manager` ロール |
+| 項目                 | 実装方法                              |
+| -------------------- | ------------------------------------- |
+| **認証方式**         | AWS Cognito + JWT                     |
+| **トークン保存**     | LocalStorage (暗号化推奨)             |
+| **トークン有効期限** | 1 時間（リフレッシュトークン: 30 日） |
+| **API 認可**         | JWT トークン検証（全エンドポイント）  |
+| **ロールベース制御** | `staff` / `manager` ロール            |
 
 ### 5.2 データ保護
 
-- **通信**: HTTPS/TLS 1.2以上
-- **DB暗号化**: RDS暗号化（at-rest）
-- **S3暗号化**: サーバーサイド暗号化（SSE-S3）
-- **パスワード**: Cognitoによる管理（bcrypt相当）
+- **通信**: HTTPS/TLS 1.2 以上
+- **DB 暗号化**: RDS 暗号化（at-rest）
+- **S3 暗号化**: サーバーサイド暗号化（SSE-S3）
+- **パスワード**: Cognito による管理（bcrypt 相当）
 - **環境変数**: AWS Systems Manager Parameter Store
 
 ### 5.3 アクセス制御
 
-#### IAMロール設計
-- **Lambda実行ロール**: RDS、S3、Cognito へのアクセス
-- **CloudFront**: S3への読み取り専用アクセス
+#### IAM ロール設計
+
+- **Lambda 実行ロール**: RDS、S3、Cognito へのアクセス
+- **CloudFront**: S3 への読み取り専用アクセス
 
 #### RLS（Row Level Security）
-- PostgreSQLのRLSポリシーで実装
+
+- PostgreSQL の RLS ポリシーで実装
 - スタッフは自分のデータのみアクセス
 - マネージャーは全データアクセス
 
@@ -333,27 +341,27 @@ export const useAttendance = (date: string) => {
 
 ### 6.1 フロントエンド最適化
 
-| 項目 | 実装 |
-|------|------|
-| **コード分割** | Next.js Dynamic Import |
-| **画像最適化** | Next.js Image コンポーネント |
-| **キャッシュ** | TanStack Query（5分間） |
-| **CDN** | CloudFront（エッジキャッシュ） |
-| **バンドルサイズ** | Tree Shaking、Code Splitting |
+| 項目               | 実装                           |
+| ------------------ | ------------------------------ |
+| **コード分割**     | Next.js Dynamic Import         |
+| **画像最適化**     | Next.js Image コンポーネント   |
+| **キャッシュ**     | TanStack Query（5 分間）       |
+| **CDN**            | CloudFront（エッジキャッシュ） |
+| **バンドルサイズ** | Tree Shaking、Code Splitting   |
 
 ### 6.2 バックエンド最適化
 
-| 項目 | 実装 |
-|------|------|
-| **DB接続プール** | SQLAlchemy（max 5 connections） |
-| **クエリ最適化** | N+1問題回避（eager loading） |
-| **Lambda設定** | メモリ: 512MB、タイムアウト: 30秒 |
-| **コールドスタート対策** | Lambda SnapStart（Python 3.11+） |
+| 項目                     | 実装                               |
+| ------------------------ | ---------------------------------- |
+| **DB 接続プール**        | SQLAlchemy（max 5 connections）    |
+| **クエリ最適化**         | N+1 問題回避（eager loading）      |
+| **Lambda 設定**          | メモリ: 512MB、タイムアウト: 30 秒 |
+| **コールドスタート対策** | Lambda SnapStart（Python 3.11+）   |
 
 ### 6.3 スケーラビリティ
 
 - **Lambda**: 自動スケーリング（同時実行数: 1000）
-- **RDS**: Multi-AZ配置、リードレプリカ
+- **RDS**: Multi-AZ 配置、リードレプリカ
 - **S3**: 無制限スケール
 - **CloudFront**: グローバルエッジロケーション
 
@@ -363,12 +371,12 @@ export const useAttendance = (date: string) => {
 
 ### 7.1 ログ戦略
 
-| ログ種別 | 保存先 | 保持期間 |
-|---------|--------|---------|
-| **アプリケーションログ** | CloudWatch Logs | 30日 |
-| **アクセスログ** | CloudFront Logs → S3 | 90日 |
-| **エラーログ** | CloudWatch Logs | 90日 |
-| **監査ログ** | RDS（access_logs テーブル） | 1年 |
+| ログ種別                 | 保存先                      | 保持期間 |
+| ------------------------ | --------------------------- | -------- |
+| **アプリケーションログ** | CloudWatch Logs             | 30 日    |
+| **アクセスログ**         | CloudFront Logs → S3        | 90 日    |
+| **エラーログ**           | CloudWatch Logs             | 90 日    |
+| **監査ログ**             | RDS（access_logs テーブル） | 1 年     |
 
 ### 7.2 メトリクス
 
@@ -379,7 +387,7 @@ export const useAttendance = (date: string) => {
 ### 7.3 アラート
 
 - Lambda エラー率 > 5%
-- API レイテンシ > 3秒
+- API レイテンシ > 3 秒
 - RDS CPU > 80%
 - RDS ストレージ残量 < 20%
 
@@ -389,16 +397,16 @@ export const useAttendance = (date: string) => {
 
 ### 8.1 バックアップ戦略
 
-| 対象 | 方法 | 頻度 | 保持期間 |
-|------|------|------|---------|
-| **RDS** | 自動バックアップ | 毎日 | 7日間 |
-| **S3（画像）** | バージョニング | - | 30日間 |
+| 対象           | 方法             | 頻度 | 保持期間 |
+| -------------- | ---------------- | ---- | -------- |
+| **RDS**        | 自動バックアップ | 毎日 | 7 日間   |
+| **S3（画像）** | バージョニング   | -    | 30 日間  |
 
 ### 8.2 災害復旧（DR）
 
-- **RPO**: 24時間（1日前の状態に復旧可能）
-- **RTO**: 4時間（4時間以内にサービス復旧）
-- **復旧手順**: CloudFormationスタック再作成 + RDSスナップショット復元
+- **RPO**: 24 時間（1 日前の状態に復旧可能）
+- **RTO**: 4 時間（4 時間以内にサービス復旧）
+- **復旧手順**: CloudFormation スタック再作成 + RDS スナップショット復元
 
 ---
 
@@ -406,74 +414,85 @@ export const useAttendance = (date: string) => {
 
 ### 9.1 環境
 
-| 環境 | 用途 | デプロイ方法 |
-|------|------|-------------|
-| **Local** | ローカル開発 | Docker Compose |
-| **Dev** | 開発環境 | GitHub Actions (developブランチ) |
-| **Staging** | ステージング | GitHub Actions (releaseブランチ) |
-| **Production** | 本番環境 | GitHub Actions (mainブランチ + タグ) |
+| 環境            | 用途         | デプロイ方法                            |
+| --------------- | ------------ | --------------------------------------- |
+| **Local**       | ローカル開発 | Docker Compose                          |
+| **Development** | 開発環境     | CodePipeline (develop ブランチ)         |
+| **Staging**     | ステージング | CodePipeline (staging ブランチ)         |
+| **Production**  | 本番環境     | CodePipeline (main ブランチ + 承認必須) |
 
 ### 9.2 CI/CD パイプライン
 
 ```
 Git Push
   ↓
-GitHub Actions
-  ├── Lint & Format (ESLint, Prettier, Black)
+GitHub Webhook
+  ↓
+CodePipeline
+  ↓
+CodeBuild
+  ├── Lint & Format (ESLint, Prettier, ruff)
   ├── Unit Tests (Jest, pytest)
   ├── Build
   │   ├── Frontend: next build → S3
   │   └── Backend: package → Lambda
-  ├── Deploy (CloudFormation)
-  └── Integration Tests
+  └── Deploy
+      ├── S3 Sync
+      ├── CloudFront Invalidation
+      └── Lambda Update
 ```
 
 ---
 
 ## 10. 非機能要件
 
-| 項目 | 目標値 |
-|------|--------|
-| **可用性** | 99.9%（月間ダウンタイム < 43分） |
-| **レスポンスタイム** | ページ読み込み < 2秒、API < 500ms |
-| **同時接続数** | 100ユーザー |
-| **データ整合性** | トランザクション保証（ACID） |
-| **セキュリティ** | OWASP Top 10対策 |
+| 項目                 | 目標値                             |
+| -------------------- | ---------------------------------- |
+| **可用性**           | 99.9%（月間ダウンタイム < 43 分）  |
+| **レスポンスタイム** | ページ読み込み < 2 秒、API < 500ms |
+| **同時接続数**       | 100 ユーザー                       |
+| **データ整合性**     | トランザクション保証（ACID）       |
+| **セキュリティ**     | OWASP Top 10 対策                  |
 
 ---
 
 ## 11. 技術選定理由
 
 ### 11.1 Next.js Pages Router
+
 - ファイルベースルーティングによる開発効率
-- SSR/SSG対応
+- SSR/SSG 対応
 - 成熟したエコシステム
 
 ### 11.2 FastAPI
+
 - 高速なパフォーマンス（Starlette + Pydantic）
-- 自動API ドキュメント生成
+- 自動 API ドキュメント生成
 - 型ヒントによる開発効率
 
 ### 11.3 AWS Lambda + API Gateway
+
 - サーバーレスによる運用コスト削減
 - 自動スケーリング
 - 従量課金
 
 ### 11.4 PostgreSQL (RDS)
+
 - リレーショナルデータに最適
-- JSONBサポート
+- JSONB サポート
 - RLS（Row Level Security）
 
 ### 11.5 Cognito
-- AWS統合認証サービス
-- JWT標準対応
+
+- AWS 統合認証サービス
+- JWT 標準対応
 - 多要素認証サポート
 
 ---
 
 ## 12. 将来的な拡張
 
-- **通知機能**: SNSによるメール・SMS通知
+- **通知機能**: SNS によるメール・SMS 通知
 - **モバイルアプリ**: React Native
 - **分析ダッシュボード**: QuickSight
 - **リアルタイム通信**: AppSync (GraphQL + WebSocket)

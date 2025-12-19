@@ -15,18 +15,22 @@ unity-okiteru/
 │   ├── API_SPECIFICATION.md      # API仕様書
 │   └── DEPLOYMENT.md             # デプロイ手順書
 │
-├── infrastructure/               # インフラコード
-│   ├── cloudformation/           # CloudFormation テンプレート
-│   │   ├── main.yml              # メインスタック
-│   │   ├── network.yml           # VPC、サブネット
-│   │   ├── database.yml          # RDS PostgreSQL
-│   │   ├── api.yml               # API Gateway、Lambda
-│   │   ├── frontend.yml          # S3、CloudFront
-│   │   └── auth.yml              # Cognito
-│   ├── scripts/                  # デプロイスクリプト
-│   │   ├── deploy.sh             # デプロイ実行
-│   │   └── rollback.sh           # ロールバック
-│   └── README.md                 # インフラ構築手順
+├── infra/                        # インフラコード
+│   └── cloudformation/           # CloudFormation テンプレート
+│       ├── 01-network.yaml       # VPC、サブネット、セキュリティグループ
+│       ├── 02-database.yaml      # RDS PostgreSQL
+│       ├── 03-cognito.yaml       # Cognito User Pool
+│       ├── 04-storage.yaml       # S3バケット
+│       ├── 05-lambda-api.yaml    # Lambda、API Gateway
+│       ├── 06-cloudfront.yaml    # CloudFront Distribution
+│       ├── 07-codepipeline.yaml  # CI/CD Pipeline
+│       ├── deploy.sh             # デプロイスクリプト
+│       ├── setup-parameters.sh   # Parameter Store設定
+│       ├── init-database.sh      # DB初期化
+│       ├── init-cognito.sh       # テストユーザー作成
+│       ├── cleanup.sh            # 環境削除
+│       ├── parameters-*.json     # 環境別パラメータ
+│       └── README.md             # インフラ構築手順
 │
 ├── frontend/                     # フロントエンドアプリケーション
 │   ├── src/
@@ -215,44 +219,46 @@ unity-okiteru/
 
 ### 2.1 フロントエンド
 
-| ファイル | 役割 |
-|---------|------|
-| `pages/_app.tsx` | アプリケーション全体のラップ、グローバルプロバイダー設定 |
-| `pages/_document.tsx` | HTMLドキュメント構造、meta タグ設定 |
-| `contexts/AuthContext.tsx` | 認証状態管理（ログイン状態、ユーザー情報） |
-| `lib/api.ts` | API クライアント（axios/fetch ラッパー） |
-| `lib/queryClient.ts` | TanStack Query 設定（キャッシュ、リトライ等） |
-| `hooks/useAuth.ts` | 認証関連カスタムフック |
-| `schemas/attendance.ts` | 勤怠データのZodバリデーションスキーマ |
+| ファイル                   | 役割                                                     |
+| -------------------------- | -------------------------------------------------------- |
+| `pages/_app.tsx`           | アプリケーション全体のラップ、グローバルプロバイダー設定 |
+| `pages/_document.tsx`      | HTML ドキュメント構造、meta タグ設定                     |
+| `contexts/AuthContext.tsx` | 認証状態管理（ログイン状態、ユーザー情報）               |
+| `lib/api.ts`               | API クライアント（axios/fetch ラッパー）                 |
+| `lib/queryClient.ts`       | TanStack Query 設定（キャッシュ、リトライ等）            |
+| `hooks/useAuth.ts`         | 認証関連カスタムフック                                   |
+| `schemas/attendance.ts`    | 勤怠データの Zod バリデーションスキーマ                  |
 
 ### 2.2 バックエンド
 
-| ファイル | 役割 |
-|---------|------|
-| `main.py` | FastAPIアプリケーション定義、ルーター登録 |
-| `config.py` | 環境変数読み込み、設定管理 |
-| `dependencies.py` | DI（get_db, get_current_user等） |
-| `database.py` | SQLAlchemy エンジン、セッション管理 |
-| `models/base.py` | SQLAlchemy ベースモデル、共通カラム定義 |
-| `schemas/common.py` | 共通Pydanticスキーマ（ページネーション、エラーレスポンス） |
-| `routers/attendance.py` | 勤怠APIエンドポイント定義 |
-| `services/attendance_service.py` | 勤怠ビジネスロジック |
-| `repositories/attendance_repository.py` | 勤怠データアクセス層 |
-| `utils/s3.py` | S3ファイルアップロード・削除 |
-| `utils/cognito.py` | Cognito JWT トークン検証 |
-| `lambda_handler.py` | AWS Lambda エントリーポイント |
+| ファイル                                | 役割                                                         |
+| --------------------------------------- | ------------------------------------------------------------ |
+| `main.py`                               | FastAPI アプリケーション定義、ルーター登録                   |
+| `config.py`                             | 環境変数読み込み、設定管理                                   |
+| `dependencies.py`                       | DI（get_db, get_current_user 等）                            |
+| `database.py`                           | SQLAlchemy エンジン、セッション管理                          |
+| `models/base.py`                        | SQLAlchemy ベースモデル、共通カラム定義                      |
+| `schemas/common.py`                     | 共通 Pydantic スキーマ（ページネーション、エラーレスポンス） |
+| `routers/attendance.py`                 | 勤怠 API エンドポイント定義                                  |
+| `services/attendance_service.py`        | 勤怠ビジネスロジック                                         |
+| `repositories/attendance_repository.py` | 勤怠データアクセス層                                         |
+| `utils/s3.py`                           | S3 ファイルアップロード・削除                                |
+| `utils/cognito.py`                      | Cognito JWT トークン検証                                     |
+| `lambda_handler.py`                     | AWS Lambda エントリーポイント                                |
 
 ### 2.3 インフラストラクチャ
 
-| ファイル | 役割 |
-|---------|------|
-| `cloudformation/main.yml` | メインスタック、全リソースの統合 |
-| `cloudformation/network.yml` | VPC、サブネット、セキュリティグループ |
-| `cloudformation/database.yml` | RDS PostgreSQL、パラメータグループ |
-| `cloudformation/api.yml` | API Gateway、Lambda、IAMロール |
-| `cloudformation/frontend.yml` | S3バケット、CloudFront ディストリビューション |
-| `cloudformation/auth.yml` | Cognito ユーザープール、クライアント |
-| `scripts/deploy.sh` | CloudFormation スタックデプロイスクリプト |
+| ファイル               | 役割                                            |
+| ---------------------- | ----------------------------------------------- |
+| `01-network.yaml`      | VPC、サブネット、セキュリティグループ           |
+| `02-database.yaml`     | RDS PostgreSQL、パラメータグループ              |
+| `03-cognito.yaml`      | Cognito ユーザープール、クライアント            |
+| `04-storage.yaml`      | S3 バケット（フロントエンド、写真、デプロイ用） |
+| `05-lambda-api.yaml`   | Lambda、API Gateway、IAM ロール                 |
+| `06-cloudfront.yaml`   | CloudFront ディストリビューション               |
+| `07-codepipeline.yaml` | CodePipeline、CodeBuild、CI/CD                  |
+| `deploy.sh`            | 全 CloudFormation スタックデプロイスクリプト    |
+| `parameters-*.json`    | 環境別パラメータファイル                        |
 
 ---
 
@@ -371,19 +377,19 @@ feature/xxx (機能開発)
 
 ### 6.1 フロントエンド
 
-| テストタイプ | ツール | 対象 |
-|------------|--------|------|
-| **ユニットテスト** | Jest + React Testing Library | コンポーネント、フック |
-| **統合テスト** | Jest | APIクライアント、Context |
-| **E2Eテスト** | Playwright | ユーザーフロー |
+| テストタイプ       | ツール                       | 対象                      |
+| ------------------ | ---------------------------- | ------------------------- |
+| **ユニットテスト** | Jest + React Testing Library | コンポーネント、フック    |
+| **統合テスト**     | Jest                         | API クライアント、Context |
+| **E2E テスト**     | Playwright                   | ユーザーフロー            |
 
 ### 6.2 バックエンド
 
-| テストタイプ | ツール | 対象 |
-|------------|--------|------|
-| **ユニットテスト** | pytest | Services, Repositories, Utils |
-| **統合テスト** | pytest + TestClient | APIエンドポイント |
-| **DB テスト** | pytest + SQLite | マイグレーション、モデル |
+| テストタイプ       | ツール              | 対象                          |
+| ------------------ | ------------------- | ----------------------------- |
+| **ユニットテスト** | pytest              | Services, Repositories, Utils |
+| **統合テスト**     | pytest + TestClient | API エンドポイント            |
+| **DB テスト**      | pytest + SQLite     | マイグレーション、モデル      |
 
 ---
 
