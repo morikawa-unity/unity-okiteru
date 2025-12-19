@@ -414,7 +414,7 @@ aws cloudformation describe-stacks \
 5. `frontend/.env.dev` ファイルを生成
 
 **作成されるパラメータ:**
-- S3バケット名
+- S3バケット名（フロントエンド、画像）
 - Lambda関数名
 - データベース接続URL（暗号化）
 - Cognito設定
@@ -460,6 +460,35 @@ aws cloudformation describe-stacks \
 **注意:**
 - 既にユーザーが存在する場合はスキップされます
 - 本番環境では使用しないでください（開発環境専用）
+
+### cleanup.sh
+
+**目的**: 開発環境の完全削除（失敗時のクリーンアップ）
+
+**処理フロー:**
+1. ユーザー確認プロンプト表示
+2. Cognitoテストユーザー削除
+3. S3バケットを空にする（フロントエンド、画像）
+4. CloudFormationスタック削除（全リソース）
+5. Parameter Store パラメータ削除
+6. ローカルファイル削除（.env.dev）
+
+**削除されるリソース:**
+- CloudFormationスタック（VPC、RDS、Cognito、S3、CloudFront、Lambda等）
+- S3バケット内の全オブジェクト
+- Cognitoテストユーザー（3人）
+- Parameter Store パラメータ（11個）
+- ローカル環境変数ファイル
+
+**削除されないリソース:**
+- データベーステーブル（RDS削除時に一緒に削除）
+- GitHub Token（Secrets Manager - 手動削除必要）
+- CodePipelineスタック（別途削除必要）
+
+**使用タイミング:**
+- デプロイ失敗後のクリーンアップ
+- 環境を作り直したい時
+- 開発環境が不要になった時
 
 ## 確認方法
 
@@ -585,11 +614,89 @@ aws cloudformation describe-stack-events \
    # 追加コスト: 約 $30-40/月
    ```
 
+## ロールバック動作
+
+### CloudFormation自動ロールバック
+
+**✅ 新規スタック作成時（初回デプロイ）:**
+- リソース作成中に失敗した場合、作成済みリソースを**すべて自動削除**
+- スタックは `ROLLBACK_COMPLETE` 状態になり削除される
+- クリーンな状態に戻る
+
+**✅ スタック更新時（2回目以降のデプロイ）:**
+- 更新中に失敗した場合、**前の状態に自動ロールバック**
+- 変更されたリソースは元に戻る
+- スタックは `UPDATE_ROLLBACK_COMPLETE` 状態
+
+**❌ 自動ロールバックされないもの:**
+- Parameter Storeの値（`./setup-parameters.sh`）
+- Cognitoテストユーザー（`./init-cognito.sh`）
+- データベーステーブル（`./init-database.sh`）
+- ローカルファイル（`.env.dev`, ログ等）
+
+### 失敗時の対処
+
+**デプロイ失敗した場合:**
+1. CloudFormationは自動的にロールバック（リソース削除）
+2. エラーログを確認：`logs/deploy-*.log`
+3. 問題を修正して再実行：`./deploy.sh`
+
+**手動クリーンアップが必要な場合:**
+```bash
+# 完全削除スクリプト実行
+./cleanup.sh
+```
+
+---
+
 ## 環境の削除
 
 開発環境が不要になった場合の削除手順：
 
-### 1. CodePipelineの削除
+### 方法1: 完全削除スクリプト（推奨）
+
+```bash
+cd infra/dev
+./cleanup.sh
+```
+
+**削除されるもの:**
+- ✅ CloudFormationスタック（全AWSリソース）
+- ✅ S3バケット内のオブジェクト
+- ✅ Cognitoテストユーザー
+- ✅ Parameter Store パラメータ
+- ✅ ローカル環境変数ファイル
+
+**所要時間:** 約10-15分
+
+### 方法2: 手動削除
+
+#### 1. S3バケットを空にする
+
+```bash
+# フロントエンドバケット
+aws s3 rm s3://okiteru-frontend-dev --recursive --region ap-northeast-1
+
+# 画像バケット
+aws s3 rm s3://okiteru-photos-dev --recursive --region ap-northeast-1
+```
+
+> **重要**: S3バケットにオブジェクトが残っていると、CloudFormationスタックの削除が失敗します。
+
+#### 2. CloudFormationスタック削除
+
+```bash
+aws cloudformation delete-stack \
+  --stack-name okiteru-infrastructure-dev \
+  --region ap-northeast-1
+
+# 削除完了を待つ（10-15分）
+aws cloudformation wait stack-delete-complete \
+  --stack-name okiteru-infrastructure-dev \
+  --region ap-northeast-1
+```
+
+#### 3. CodePipelineの削除
 
 ```bash
 cd ../codepipeline
@@ -598,27 +705,7 @@ aws cloudformation delete-stack \
   --region ap-northeast-1
 ```
 
-### 2. S3バケットの削除
-
-```bash
-# バケット内のオブジェクトを削除
-aws s3 rm s3://okiteru-frontend-dev --recursive
-
-# バケット自体は CloudFormation で削除されます
-```
-
-### 3. インフラスタックの削除
-
-```bash
-cd ../dev
-aws cloudformation delete-stack \
-  --stack-name okiteru-infrastructure-dev \
-  --region ap-northeast-1
-```
-
-> **注意**: RDSインスタンスは削除保護が有効な場合、手動で無効化する必要があります。
-
-### 4. Parameter Storeの削除（オプション）
+#### 4. Parameter Storeの削除（オプション）
 
 ```bash
 # 全てのパラメータを削除
