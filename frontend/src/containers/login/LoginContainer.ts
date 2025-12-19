@@ -32,15 +32,13 @@ export const LoginContainer: React.FC = () => {
     }
   };
 
-  return (
-    <LoginForm
-      email={email}
-      password={password}
-      error={error}
-      isLoading={isLoading}
-      onEmailChange={setEmail}
-      onPasswordChange={setPassword}
-      onSubmit={handleSubmit}
-    />
-  );
+  return React.createElement(LoginForm, {
+    email,
+    password,
+    error,
+    isLoading,
+    onEmailChange: setEmail,
+    onPasswordChange: setPassword,
+    onSubmit: handleSubmit,
+  });
 };

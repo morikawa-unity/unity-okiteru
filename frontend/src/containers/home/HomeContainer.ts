@@ -2,7 +2,7 @@
  * HomeContainer - ホーム画面のビジネスロジック
  * 勤怠報告・出社可能日・日報管理のロジックを統合
  */
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
@@ -326,38 +326,36 @@ export const HomeContainer: React.FC = () => {
 
   const actionStatuses = getActionStatuses();
 
-  return (
-    <HomeView
-      isLoading={isLoading}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      currentRecord={currentRecord}
-      actionStatuses={actionStatuses}
-      activeAction={activeAction}
-      onActionClick={handleActionClick}
-      onPreviousDaySuccess={handlePreviousDaySuccess}
-      onCancelPreviousDay={handleCancelPreviousDay}
-      showShiftForm={showShiftForm}
-      selectedDate={selectedDate}
-      selectedWorksite={selectedWorksite}
-      shiftNotes={shiftNotes}
-      isSubmittingShift={isSubmittingShift}
-      availabilities={availabilities}
-      worksites={worksites}
-      onToggleShiftForm={() => setShowShiftForm(!showShiftForm)}
-      onDateChange={setSelectedDate}
-      onWorksiteChange={setSelectedWorksite}
-      onShiftNotesChange={setShiftNotes}
-      onShiftSubmit={handleShiftSubmit}
-      onShiftCancel={handleShiftCancel}
-      showReportForm={showReportForm}
-      reportContent={reportContent}
-      isSubmittingReport={isSubmittingReport}
-      reports={reports}
-      onToggleReportForm={() => setShowReportForm(!showReportForm)}
-      onReportContentChange={setReportContent}
-      onReportSubmit={handleReportSubmit}
-      onReportCancel={handleReportCancel}
-    />
-  );
+  return React.createElement(HomeView, {
+    isLoading,
+    activeTab,
+    onTabChange: setActiveTab,
+    currentRecord,
+    actionStatuses,
+    activeAction,
+    onActionClick: handleActionClick,
+    onPreviousDaySuccess: handlePreviousDaySuccess,
+    onCancelPreviousDay: handleCancelPreviousDay,
+    showShiftForm,
+    selectedDate,
+    selectedWorksite,
+    shiftNotes,
+    isSubmittingShift,
+    availabilities,
+    worksites,
+    onToggleShiftForm: () => setShowShiftForm(!showShiftForm),
+    onDateChange: setSelectedDate,
+    onWorksiteChange: setSelectedWorksite,
+    onShiftNotesChange: setShiftNotes,
+    onShiftSubmit: handleShiftSubmit,
+    onShiftCancel: handleShiftCancel,
+    showReportForm,
+    reportContent,
+    isSubmittingReport,
+    reports,
+    onToggleReportForm: () => setShowReportForm(!showReportForm),
+    onReportContentChange: setReportContent,
+    onReportSubmit: handleReportSubmit,
+    onReportCancel: handleReportCancel,
+  });
 };
