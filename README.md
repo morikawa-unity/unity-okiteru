@@ -291,7 +291,7 @@ alembic upgrade head
 ### 1. インフラストラクチャデプロイ
 
 ```bash
-cd infra/cloudformation
+cd infra
 ./deploy.sh --env development
 ```
 

@@ -93,13 +93,13 @@ GitHub Repository
 
 **CloudFormation テンプレート構成:**
 
-- `infra/cloudformation/01-network.yaml` - VPC、サブネット、セキュリティグループ
-- `infra/cloudformation/02-database.yaml` - RDS PostgreSQL
-- `infra/cloudformation/03-cognito.yaml` - Cognito User Pool
-- `infra/cloudformation/04-storage.yaml` - S3 バケット
-- `infra/cloudformation/05-lambda-api.yaml` - Lambda、API Gateway
-- `infra/cloudformation/06-cloudfront.yaml` - CloudFront Distribution
-- `infra/cloudformation/07-codepipeline.yaml` - CI/CD Pipeline
+- `infra/01-network.yaml` - VPC、サブネット、セキュリティグループ
+- `infra/02-database.yaml` - RDS PostgreSQL
+- `infra/03-cognito.yaml` - Cognito User Pool
+- `infra/04-storage.yaml` - S3 バケット
+- `infra/05-lambda-api.yaml` - Lambda、API Gateway
+- `infra/06-cloudfront.yaml` - CloudFront Distribution
+- `infra/07-codepipeline.yaml` - CI/CD Pipeline
 
 ---
 

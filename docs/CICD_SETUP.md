@@ -70,7 +70,7 @@ aws secretsmanager create-secret \
 
 ### 2. CloudFormation パラメータの設定
 
-`infra/cloudformation/parameters-*.json` で GitHub の設定を確認：
+`infra/parameters-*.json` で GitHub の設定を確認：
 
 ```json
 {
@@ -92,7 +92,7 @@ aws secretsmanager create-secret \
 CI/CD パイプラインも含めて全インフラをデプロイ：
 
 ```bash
-cd infra/cloudformation
+cd infra
 
 # 開発環境
 ./deploy.sh --env development
@@ -104,7 +104,7 @@ cd infra/cloudformation
 ./deploy.sh --env production
 ```
 
-詳細は [`infra/cloudformation/README.md`](../infra/cloudformation/README.md) を参照してください。
+詳細は [`infra/README.md`](../infra/README.md) を参照してください。
 
 ---
 

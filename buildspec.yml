@@ -1,7 +1,7 @@
 version: 0.2
 
 # CodeBuild用ビルド仕様
-# 環境変数 ENV (dev/staging/prod) に応じてデプロイ先を切り替え
+# 環境変数 ENV (development/staging/production) に応じてデプロイ先を切り替え
 
 env:
   variables:
@@ -38,10 +38,10 @@ phases:
       - npm ci
 
       - echo "Frontend - Running lint..."
-      - npm run lint || true  # Lintエラーでも継続（警告として扱う）
+      - npm run lint || true # Lintエラーでも継続（警告として扱う）
 
       - echo "Frontend - Running tests..."
-      - npm run test:ci || true  # テストエラーでも継続（CI環境用）
+      - npm run test:ci || true # テストエラーでも継続（CI環境用）
 
       # バックエンド - Lint & Test
       - echo "Backend - Installing dependencies..."
@@ -115,10 +115,10 @@ phases:
 
 artifacts:
   files:
-    - '**/*'
+    - "**/*"
   name: okiteru-build-$(date +%Y%m%d-%H%M%S)
 
 cache:
   paths:
-    - 'frontend/node_modules/**/*'
-    - 'backend/.venv/**/*'
+    - "frontend/node_modules/**/*"
+    - "backend/.venv/**/*"
