@@ -1,6 +1,6 @@
 /**
- * AttendanceContainer - 勤怠報告画面のビジネスロジック
- * コンテナコンポーネント（状態管理、API呼び出し、イベント処理）
+ * HomeContainer - ホーム画面のビジネスロジック
+ * 勤怠報告・出社可能日・日報管理のロジックを統合
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -8,28 +8,87 @@ import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
 import { AttendanceRecord } from '@/types/attendance';
 import { formatDate } from '@/utils/date';
-import { ActionType, AttendanceStatus } from '@/lib/enums';
-import { AttendanceView, ActionStatus } from '@/components/attendance/AttendanceView';
+import { ActionType, AttendanceStatus, ReportStatus } from '@/lib/enums';
+import {
+  HomeView,
+  HomeTab,
+  ActionStatus,
+  Availability,
+  Worksite,
+  Report,
+} from '@/components/home/HomeView';
 
-export const AttendanceContainer: React.FC = () => {
+export const HomeContainer: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+
+  // タブ管理
+  const [activeTab, setActiveTab] = useState<HomeTab>('attendance');
+
+  // 勤怠報告の状態
   const [currentRecord, setCurrentRecord] = useState<AttendanceRecord | null>(null);
   const [hasPreviousDayReport, setHasPreviousDayReport] = useState(false);
   const [hasDailyReport, setHasDailyReport] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
 
+  // 出社可能日の状態
+  const [showShiftForm, setShowShiftForm] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedWorksite, setSelectedWorksite] = useState('');
+  const [shiftNotes, setShiftNotes] = useState('');
+  const [isSubmittingShift, setIsSubmittingShift] = useState(false);
+  const [availabilities] = useState<Availability[]>([
+    {
+      id: '1',
+      date: '2025-12-19',
+      worksite: { id: '1', name: '渋谷現場' },
+      notes: '通常勤務',
+    },
+    {
+      id: '2',
+      date: '2025-12-20',
+      worksite: { id: '2', name: '新宿現場' },
+      notes: '',
+    },
+  ]);
+  const [worksites] = useState<Worksite[]>([
+    { id: '1', name: '渋谷現場' },
+    { id: '2', name: '新宿現場' },
+    { id: '3', name: '池袋現場' },
+  ]);
+
+  // 日報の状態
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportContent, setReportContent] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reports] = useState<Report[]>([
+    {
+      id: '1',
+      date: '2025-12-17',
+      content: '渋谷現場での作業を実施。配線工事を完了しました。',
+      status: ReportStatus.SUBMITTED,
+      submittedAt: '2025-12-17T18:30:00Z',
+    },
+    {
+      id: '2',
+      date: '2025-12-16',
+      content: '新宿現場の点検業務を実施。異常なし。',
+      status: ReportStatus.SUBMITTED,
+      submittedAt: '2025-12-16T17:00:00Z',
+    },
+  ]);
+
+  // 認証チェック
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push(ROUTES.LOGIN);
     }
   }, [isLoading, isAuthenticated, router]);
 
+  // 勤怠記録の初期化
   useEffect(() => {
     if (user) {
-      // TODO: 実際のAPI呼び出し
-      // 今日の勤怠記録と前日報告、日報の状態を取得
       const mockRecord: AttendanceRecord = {
         id: '1',
         staffId: user.id,
@@ -39,11 +98,12 @@ export const AttendanceContainer: React.FC = () => {
         updatedAt: new Date().toISOString(),
       };
       setCurrentRecord(mockRecord);
-      setHasPreviousDayReport(false); // モックデータ
-      setHasDailyReport(false); // モックデータ
+      setHasPreviousDayReport(false);
+      setHasDailyReport(false);
     }
   }, [user]);
 
+  // 勤怠報告: アクションステータスの取得
   const getActionStatuses = (): ActionStatus[] => {
     if (!currentRecord) return [];
 
@@ -97,17 +157,18 @@ export const AttendanceContainer: React.FC = () => {
     ];
   };
 
+  // 勤怠報告: 前日報告成功時の処理
   const handlePreviousDaySuccess = () => {
     setHasPreviousDayReport(true);
     setActiveAction(null);
   };
 
+  // 勤怠報告: 起床報告
   const handleWakeUp = async () => {
     if (!currentRecord) return;
 
     setIsSubmitting(true);
     try {
-      // TODO: 実際のAPI呼び出し
       const now = new Date().toISOString();
       const updatedRecord: AttendanceRecord = {
         ...currentRecord,
@@ -128,12 +189,12 @@ export const AttendanceContainer: React.FC = () => {
     }
   };
 
+  // 勤怠報告: 出発報告
   const handleDeparture = async () => {
     if (!currentRecord) return;
 
     setIsSubmitting(true);
     try {
-      // TODO: 実際のAPI呼び出し
       const now = new Date().toISOString();
       const updatedRecord: AttendanceRecord = {
         ...currentRecord,
@@ -154,12 +215,12 @@ export const AttendanceContainer: React.FC = () => {
     }
   };
 
+  // 勤怠報告: 到着報告
   const handleArrival = async () => {
     if (!currentRecord) return;
 
     setIsSubmitting(true);
     try {
-      // TODO: 実際のAPI呼び出し
       const now = new Date().toISOString();
       const updatedRecord: AttendanceRecord = {
         ...currentRecord,
@@ -180,10 +241,13 @@ export const AttendanceContainer: React.FC = () => {
     }
   };
 
+  // 勤怠報告: 日報作成へ遷移
   const handleNavigateToReport = () => {
-    router.push(ROUTES.DASHBOARD.REPORTS);
+    setActiveTab('reports');
+    setShowReportForm(true);
   };
 
+  // 勤怠報告: アクションクリック
   const handleActionClick = (action: ActionStatus) => {
     if (!action.enabled || action.completed) return;
 
@@ -200,21 +264,101 @@ export const AttendanceContainer: React.FC = () => {
     }
   };
 
+  // 勤怠報告: 前日報告キャンセル
   const handleCancelPreviousDay = () => {
     setActiveAction(null);
+  };
+
+  // 出社可能日: フォーム送信
+  const handleShiftSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingShift(true);
+
+    try {
+      console.log('出社可能日:', { selectedDate, selectedWorksite, shiftNotes });
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      alert('出社可能日を登録しました！');
+      setSelectedDate('');
+      setSelectedWorksite('');
+      setShiftNotes('');
+      setShowShiftForm(false);
+    } catch (error) {
+      console.error('出社可能日登録エラー:', error);
+      alert('出社可能日の登録に失敗しました');
+    } finally {
+      setIsSubmittingShift(false);
+    }
+  };
+
+  // 出社可能日: キャンセル
+  const handleShiftCancel = () => {
+    setShowShiftForm(false);
+    setSelectedDate('');
+    setSelectedWorksite('');
+    setShiftNotes('');
+  };
+
+  // 日報: フォーム送信
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingReport(true);
+
+    try {
+      console.log('日報内容:', reportContent);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      alert('日報を提出しました！');
+      setReportContent('');
+      setShowReportForm(false);
+    } catch (error) {
+      console.error('日報提出エラー:', error);
+      alert('日報の提出に失敗しました');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  // 日報: キャンセル
+  const handleReportCancel = () => {
+    setShowReportForm(false);
+    setReportContent('');
   };
 
   const actionStatuses = getActionStatuses();
 
   return (
-    <AttendanceView
+    <HomeView
       isLoading={isLoading}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
       currentRecord={currentRecord}
       actionStatuses={actionStatuses}
       activeAction={activeAction}
       onActionClick={handleActionClick}
       onPreviousDaySuccess={handlePreviousDaySuccess}
       onCancelPreviousDay={handleCancelPreviousDay}
+      showShiftForm={showShiftForm}
+      selectedDate={selectedDate}
+      selectedWorksite={selectedWorksite}
+      shiftNotes={shiftNotes}
+      isSubmittingShift={isSubmittingShift}
+      availabilities={availabilities}
+      worksites={worksites}
+      onToggleShiftForm={() => setShowShiftForm(!showShiftForm)}
+      onDateChange={setSelectedDate}
+      onWorksiteChange={setSelectedWorksite}
+      onShiftNotesChange={setShiftNotes}
+      onShiftSubmit={handleShiftSubmit}
+      onShiftCancel={handleShiftCancel}
+      showReportForm={showReportForm}
+      reportContent={reportContent}
+      isSubmittingReport={isSubmittingReport}
+      reports={reports}
+      onToggleReportForm={() => setShowReportForm(!showReportForm)}
+      onReportContentChange={setReportContent}
+      onReportSubmit={handleReportSubmit}
+      onReportCancel={handleReportCancel}
     />
   );
 };
