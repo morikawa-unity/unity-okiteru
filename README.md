@@ -280,8 +280,8 @@ alembic upgrade head
 ### 1. インフラストラクチャデプロイ
 
 ```bash
-cd infrastructure
-./scripts/deploy.sh --env production --stack-name okiteru-prod
+cd infra/dev
+./deploy.sh
 ```
 
 ### 2. フロントエンドデプロイ
