@@ -6,24 +6,23 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
-import { AttendanceRecord } from '@/types/attendance';
 import { formatDate } from '@/utils/date';
-import { ActionType, AttendanceStatus, ReportStatus } from '@/lib/enums';
-import {
-  HomeView,
-  HomeTab,
+import { ActionType, AttendanceStatus, ReportStatus, HomeTab } from '@/lib/enums';
+import { HomeView } from '@/components/home/HomeView';
+import type {
   ActionStatus,
+  AttendanceRecord,
   Availability,
   Worksite,
   Report,
-} from '@/components/home/HomeView';
+} from '@/types/home';
 
 export const HomeContainer: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 
   // タブ管理
-  const [activeTab, setActiveTab] = useState<HomeTab>('attendance');
+  const [activeTab, setActiveTab] = useState<HomeTab>(HomeTab.ATTENDANCE);
 
   // 勤怠報告の状態
   const [currentRecord, setCurrentRecord] = useState<AttendanceRecord | null>(null);
@@ -243,7 +242,7 @@ export const HomeContainer: React.FC = () => {
 
   // 勤怠報告: 日報作成へ遷移
   const handleNavigateToReport = () => {
-    setActiveTab('reports');
+    setActiveTab(HomeTab.REPORTS);
     setShowReportForm(true);
   };
 

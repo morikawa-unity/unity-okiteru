@@ -6,83 +6,13 @@ import React, { useState } from 'react';
 import { Loading } from '@/components/common/Loading';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { AttendanceRecord } from '@/types/attendance';
 import { formatDate } from '@/utils/date';
-import { ActionType, ReportStatus } from '@/lib/enums';
+import { ActionType, ReportStatus, HomeTab } from '@/lib/enums';
 import { usePreviousDayReportCreate } from '@/hooks/usePreviousDayReport';
+import type { HomeViewProps, ActionStatus, AttendanceRecord } from '@/types/home';
 
-// タブの種類
-export type HomeTab = 'attendance' | 'shifts' | 'reports';
-
-// 型定義
-export interface ActionStatus {
-  type: ActionType;
-  label: string;
-  activeLabel: string;
-  completed: boolean;
-  enabled: boolean;
-  description: string;
-}
-
-export interface Availability {
-  id: string;
-  date: string;
-  worksite: Worksite;
-  notes?: string;
-}
-
-export interface Worksite {
-  id: string;
-  name: string;
-}
-
-export interface Report {
-  id: string;
-  date: string;
-  content: string;
-  status: ReportStatus;
-  submittedAt?: string;
-}
-
-export interface HomeViewProps {
-  // 共通
-  isLoading: boolean;
-  activeTab: HomeTab;
-  onTabChange: (tab: HomeTab) => void;
-
-  // 勤怠報告
-  currentRecord: AttendanceRecord | null;
-  actionStatuses: ActionStatus[];
-  activeAction: ActionType | null;
-  onActionClick: (action: ActionStatus) => void;
-  onPreviousDaySuccess: () => void;
-  onCancelPreviousDay: () => void;
-
-  // 出社可能日
-  showShiftForm: boolean;
-  selectedDate: string;
-  selectedWorksite: string;
-  shiftNotes: string;
-  isSubmittingShift: boolean;
-  availabilities: Availability[];
-  worksites: Worksite[];
-  onToggleShiftForm: () => void;
-  onDateChange: (date: string) => void;
-  onWorksiteChange: (worksiteId: string) => void;
-  onShiftNotesChange: (notes: string) => void;
-  onShiftSubmit: (e: React.FormEvent) => void;
-  onShiftCancel: () => void;
-
-  // 日報
-  showReportForm: boolean;
-  reportContent: string;
-  isSubmittingReport: boolean;
-  reports: Report[];
-  onToggleReportForm: () => void;
-  onReportContentChange: (content: string) => void;
-  onReportSubmit: (e: React.FormEvent) => void;
-  onReportCancel: () => void;
-}
+// Re-export types for convenience
+export type { HomeViewProps, ActionStatus };
 
 // PreviousDayForm コンポーネント
 interface PreviousDayFormProps {
@@ -276,9 +206,9 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
-            onClick={() => onTabChange('attendance')}
+            onClick={() => onTabChange(HomeTab.ATTENDANCE)}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'attendance'
+              activeTab === HomeTab.ATTENDANCE
                 ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
@@ -286,9 +216,9 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
             勤怠報告
           </button>
           <button
-            onClick={() => onTabChange('shifts')}
+            onClick={() => onTabChange(HomeTab.SHIFTS)}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'shifts'
+              activeTab === HomeTab.SHIFTS
                 ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
@@ -296,9 +226,9 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
             出社可能日
           </button>
           <button
-            onClick={() => onTabChange('reports')}
+            onClick={() => onTabChange(HomeTab.REPORTS)}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'reports'
+              activeTab === HomeTab.REPORTS
                 ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
@@ -309,7 +239,7 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
       </div>
 
       {/* 勤怠報告タブ */}
-      {activeTab === 'attendance' && currentRecord && (
+      {activeTab === HomeTab.ATTENDANCE && currentRecord && (
         <>
           {/* 次のアクションの推奨表示 */}
           {(() => {
@@ -502,7 +432,7 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
       )}
 
       {/* 出社可能日タブ */}
-      {activeTab === 'shifts' && (
+      {activeTab === HomeTab.SHIFTS && (
         <>
           <div className="mb-6">
             <Button onClick={onToggleShiftForm} className="w-full">
@@ -593,7 +523,7 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
       )}
 
       {/* 日報管理タブ */}
-      {activeTab === 'reports' && (
+      {activeTab === HomeTab.REPORTS && (
         <>
           <div className="mb-6">
             <Button onClick={onToggleReportForm} className="w-full">

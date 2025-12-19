@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { PreviousDayReport, PreviousDayReportFormData } from '@/types/report';
+import type { PreviousDayReport, PreviousDayReportFormData } from '@/types/home';
 
 /**
  * 前日報告作成用のリクエスト型

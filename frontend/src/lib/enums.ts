@@ -152,6 +152,40 @@ export const getActionTypeLabel = (type: ActionType): string => {
 };
 
 // ============================================================================
+// ホームタブ (HomeTab)
+// ============================================================================
+
+/**
+ * ホームタブ値
+ */
+export const HomeTab = {
+  ATTENDANCE: 'attendance',
+  SHIFTS: 'shifts',
+  REPORTS: 'reports',
+} as const;
+
+/**
+ * ホームタブ型
+ */
+export type HomeTab = (typeof HomeTab)[keyof typeof HomeTab];
+
+/**
+ * ホームタブラベルマップ
+ */
+export const HomeTabLabel: Record<HomeTab, string> = {
+  [HomeTab.ATTENDANCE]: '勤怠報告',
+  [HomeTab.SHIFTS]: '出社可能日',
+  [HomeTab.REPORTS]: '日報管理',
+};
+
+/**
+ * ホームタブのラベルを取得
+ */
+export const getHomeTabLabel = (tab: HomeTab): string => {
+  return HomeTabLabel[tab] || tab;
+};
+
+// ============================================================================
 // ボタンバリアント (ButtonVariant)
 // ============================================================================
 
