@@ -68,7 +68,7 @@ export interface PreviousDayReport {
 }
 
 /**
- * 前日報告フォームデータ
+ * 前日報告フォームデータ（API送信用）
  */
 export interface PreviousDayReportFormData {
   reportDate: string;
@@ -78,6 +78,16 @@ export interface PreviousDayReportFormData {
   appearancePhotoUrl: string;
   routePhotoUrl: string;
   notes?: string;
+}
+
+/**
+ * 前日報告フォーム入力データ（UI用）
+ */
+export interface PreviousDayFormData {
+  nextWakeUpTime: string;
+  nextDepartureTime: string;
+  nextArrivalTime: string;
+  notes: string;
 }
 
 // ========================================
@@ -153,8 +163,17 @@ export interface HomeViewProps {
   actionStatuses: ActionStatus[];
   activeAction: ActionType | null;
   onActionClick: (action: ActionStatus) => void;
-  onPreviousDaySuccess: () => void;
+  onPreviousDaySubmit: (e: React.FormEvent) => void;
   onCancelPreviousDay: () => void;
+
+  // 前日報告フォーム
+  previousDayFormData: PreviousDayFormData;
+  onPreviousDayFormChange: (field: keyof PreviousDayFormData, value: string) => void;
+  appearancePhoto: File | null;
+  onAppearancePhotoChange: (file: File | null) => void;
+  routePhoto: File | null;
+  onRoutePhotoChange: (file: File | null) => void;
+  isPreviousDaySubmitting: boolean;
 
   // 出社可能日
   showShiftForm: boolean;

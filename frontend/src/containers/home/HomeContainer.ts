@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
+import { usePreviousDayReportCreate } from '@/hooks/usePreviousDayReport';
 import { ROUTES } from '@/lib/constants';
 import { formatDate } from '@/utils/date';
 import { ActionType, AttendanceStatus, ReportStatus, HomeTab } from '@/lib/enums';
@@ -15,14 +16,27 @@ import type {
   Availability,
   Worksite,
   Report,
+  PreviousDayReportFormData,
+  PreviousDayFormData,
 } from '@/types/home';
 
 export const HomeContainer: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const createPreviousDayReportMutation = usePreviousDayReportCreate();
 
   // タブ管理
   const [activeTab, setActiveTab] = useState<HomeTab>(HomeTab.ATTENDANCE);
+
+  // 前日報告フォームの状態
+  const [previousDayFormData, setPreviousDayFormData] = useState<PreviousDayFormData>({
+    nextWakeUpTime: '',
+    nextDepartureTime: '',
+    nextArrivalTime: '',
+    notes: '',
+  });
+  const [appearancePhoto, setAppearancePhoto] = useState<File | null>(null);
+  const [routePhoto, setRoutePhoto] = useState<File | null>(null);
 
   // 勤怠報告の状態
   const [currentRecord, setCurrentRecord] = useState<AttendanceRecord | null>(null);
@@ -156,7 +170,52 @@ export const HomeContainer: React.FC = () => {
     ];
   };
 
-  // 勤怠報告: 前日報告成功時の処理
+  // 勤怠報告: 前日報告送信処理
+  const handlePreviousDaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!appearancePhoto || !routePhoto) {
+      alert('写真を選択してください');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const appearancePhotoUrl = `temp://${appearancePhoto.name}`;
+      const routePhotoUrl = `temp://${routePhoto.name}`;
+      const today = new Date().toISOString().split('T')[0];
+      const formatTime = (time: string) => (time.length === 5 ? `${time}:00` : time);
+
+      await createPreviousDayReportMutation.mutateAsync({
+        reportDate: today,
+        nextWakeUpTime: formatTime(previousDayFormData.nextWakeUpTime),
+        nextDepartureTime: formatTime(previousDayFormData.nextDepartureTime),
+        nextArrivalTime: formatTime(previousDayFormData.nextArrivalTime),
+        appearancePhotoUrl,
+        routePhotoUrl,
+        notes: previousDayFormData.notes || undefined,
+      });
+
+      alert('前日報告を送信しました！');
+      setPreviousDayFormData({
+        nextWakeUpTime: '',
+        nextDepartureTime: '',
+        nextArrivalTime: '',
+        notes: '',
+      });
+      setAppearancePhoto(null);
+      setRoutePhoto(null);
+      setHasPreviousDayReport(true);
+      setActiveAction(null);
+    } catch (error) {
+      console.error('前日報告エラー:', error);
+      alert('前日報告の送信に失敗しました');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 勤怠報告: 前日報告成功時の処理（後方互換性のため残す）
   const handlePreviousDaySuccess = () => {
     setHasPreviousDayReport(true);
     setActiveAction(null);
@@ -263,9 +322,22 @@ export const HomeContainer: React.FC = () => {
     }
   };
 
+  // 勤怠報告: 前日報告フォーム変更ハンドラー
+  const handlePreviousDayFormChange = (field: keyof PreviousDayFormData, value: string) => {
+    setPreviousDayFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
   // 勤怠報告: 前日報告キャンセル
   const handleCancelPreviousDay = () => {
     setActiveAction(null);
+    setPreviousDayFormData({
+      nextWakeUpTime: '',
+      nextDepartureTime: '',
+      nextArrivalTime: '',
+      notes: '',
+    });
+    setAppearancePhoto(null);
+    setRoutePhoto(null);
   };
 
   // 出社可能日: フォーム送信
@@ -334,8 +406,15 @@ export const HomeContainer: React.FC = () => {
     actionStatuses,
     activeAction,
     onActionClick: handleActionClick,
-    onPreviousDaySuccess: handlePreviousDaySuccess,
+    onPreviousDaySubmit: handlePreviousDaySubmit,
     onCancelPreviousDay: handleCancelPreviousDay,
+    previousDayFormData,
+    onPreviousDayFormChange: handlePreviousDayFormChange,
+    appearancePhoto,
+    onAppearancePhotoChange: setAppearancePhoto,
+    routePhoto,
+    onRoutePhotoChange: setRoutePhoto,
+    isPreviousDaySubmitting: createPreviousDayReportMutation.isPending,
     showShiftForm,
     selectedDate,
     selectedWorksite,

@@ -2,73 +2,39 @@
  * HomeView - ホーム画面UI
  * 勤怠報告・出社可能日・日報管理を1つの画面で管理
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { Loading } from '@/components/common/Loading';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { formatDate } from '@/utils/date';
 import { ActionType, ReportStatus, HomeTab } from '@/lib/enums';
-import { usePreviousDayReportCreate } from '@/hooks/usePreviousDayReport';
-import type { HomeViewProps, ActionStatus, AttendanceRecord } from '@/types/home';
-
-// Re-export types for convenience
-export type { HomeViewProps, ActionStatus };
+import type { HomeViewProps, ActionStatus, PreviousDayFormData } from '@/types/home';
 
 // PreviousDayForm コンポーネント
 interface PreviousDayFormProps {
-  onSuccess?: () => void;
+  formData: PreviousDayFormData;
+  onFormChange: (field: keyof PreviousDayFormData, value: string) => void;
+  appearancePhoto: File | null;
+  onAppearancePhotoChange: (file: File | null) => void;
+  routePhoto: File | null;
+  onRoutePhotoChange: (file: File | null) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  isSubmitting: boolean;
 }
 
-const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
-  const [formData, setFormData] = useState({
-    nextWakeUpTime: '',
-    nextDepartureTime: '',
-    nextArrivalTime: '',
-    notes: '',
-  });
-  const [appearancePhoto, setAppearancePhoto] = useState<File | null>(null);
-  const [routePhoto, setRoutePhoto] = useState<File | null>(null);
-
-  const createMutation = usePreviousDayReportCreate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!appearancePhoto || !routePhoto) {
-      alert('写真を選択してください');
-      return;
-    }
-
-    try {
-      const appearancePhotoUrl = `temp://${appearancePhoto.name}`;
-      const routePhotoUrl = `temp://${routePhoto.name}`;
-      const today = new Date().toISOString().split('T')[0];
-      const formatTime = (time: string) => (time.length === 5 ? `${time}:00` : time);
-
-      await createMutation.mutateAsync({
-        reportDate: today,
-        nextWakeUpTime: formatTime(formData.nextWakeUpTime),
-        nextDepartureTime: formatTime(formData.nextDepartureTime),
-        nextArrivalTime: formatTime(formData.nextArrivalTime),
-        appearancePhotoUrl,
-        routePhotoUrl,
-        notes: formData.notes || undefined,
-      });
-
-      alert('前日報告を送信しました！');
-      setFormData({ nextWakeUpTime: '', nextDepartureTime: '', nextArrivalTime: '', notes: '' });
-      setAppearancePhoto(null);
-      setRoutePhoto(null);
-      onSuccess?.();
-    } catch (error) {
-      console.error('前日報告エラー:', error);
-      alert('前日報告の送信に失敗しました');
-    }
-  };
-
+const PreviousDayForm: React.FC<PreviousDayFormProps> = ({
+  formData,
+  onFormChange,
+  appearancePhoto,
+  onAppearancePhotoChange,
+  routePhoto,
+  onRoutePhotoChange,
+  onSubmit,
+  isSubmitting,
+}) => {
   return (
     <Card title="前日報告">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={onSubmit} className="space-y-6">
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
           <p className="text-sm text-blue-800">翌日の予定時刻と準備状況を報告してください。</p>
         </div>
@@ -81,7 +47,7 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
             type="time"
             required
             value={formData.nextWakeUpTime}
-            onChange={(e) => setFormData({ ...formData, nextWakeUpTime: e.target.value })}
+            onChange={(e) => onFormChange('nextWakeUpTime', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -94,7 +60,7 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
             type="time"
             required
             value={formData.nextDepartureTime}
-            onChange={(e) => setFormData({ ...formData, nextDepartureTime: e.target.value })}
+            onChange={(e) => onFormChange('nextDepartureTime', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -107,7 +73,7 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
             type="time"
             required
             value={formData.nextArrivalTime}
-            onChange={(e) => setFormData({ ...formData, nextArrivalTime: e.target.value })}
+            onChange={(e) => onFormChange('nextArrivalTime', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -120,10 +86,12 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
             type="file"
             accept="image/*"
             required
-            onChange={(e) => setAppearancePhoto(e.target.files?.[0] || null)}
+            onChange={(e) => onAppearancePhotoChange(e.target.files?.[0] || null)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
-          {appearancePhoto && <p className="mt-2 text-sm text-gray-600">選択: {appearancePhoto.name}</p>}
+          {appearancePhoto && (
+            <p className="mt-2 text-sm text-gray-600">選択: {appearancePhoto.name}</p>
+          )}
         </div>
 
         <div>
@@ -134,7 +102,7 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
             type="file"
             accept="image/*"
             required
-            onChange={(e) => setRoutePhoto(e.target.files?.[0] || null)}
+            onChange={(e) => onRoutePhotoChange(e.target.files?.[0] || null)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           {routePhoto && <p className="mt-2 text-sm text-gray-600">選択: {routePhoto.name}</p>}
@@ -145,13 +113,13 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
           <textarea
             rows={3}
             value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            onChange={(e) => onFormChange('notes', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="特記事項があれば記入してください"
           />
         </div>
 
-        <Button type="submit" className="w-full" isLoading={createMutation.isPending}>
+        <Button type="submit" className="w-full" isLoading={isSubmitting}>
           前日報告を送信
         </Button>
       </form>
@@ -160,40 +128,45 @@ const PreviousDayForm: React.FC<PreviousDayFormProps> = ({ onSuccess }) => {
 };
 
 // メインコンポーネント
-export const HomeView: React.FC<HomeViewProps> = (props) => {
-  const {
-    isLoading,
-    activeTab,
-    onTabChange,
-    currentRecord,
-    actionStatuses,
-    activeAction,
-    onActionClick,
-    onPreviousDaySuccess,
-    onCancelPreviousDay,
-    showShiftForm,
-    selectedDate,
-    selectedWorksite,
-    shiftNotes,
-    isSubmittingShift,
-    availabilities,
-    worksites,
-    onToggleShiftForm,
-    onDateChange,
-    onWorksiteChange,
-    onShiftNotesChange,
-    onShiftSubmit,
-    onShiftCancel,
-    showReportForm,
-    reportContent,
-    isSubmittingReport,
-    reports,
-    onToggleReportForm,
-    onReportContentChange,
-    onReportSubmit,
-    onReportCancel,
-  } = props;
-
+export const HomeView: React.FC<HomeViewProps> = ({
+  isLoading,
+  activeTab,
+  onTabChange,
+  currentRecord,
+  actionStatuses,
+  activeAction,
+  onActionClick,
+  onPreviousDaySubmit,
+  onCancelPreviousDay,
+  previousDayFormData,
+  onPreviousDayFormChange,
+  appearancePhoto,
+  onAppearancePhotoChange,
+  routePhoto,
+  onRoutePhotoChange,
+  isPreviousDaySubmitting,
+  showShiftForm,
+  selectedDate,
+  selectedWorksite,
+  shiftNotes,
+  isSubmittingShift,
+  availabilities,
+  worksites,
+  onToggleShiftForm,
+  onDateChange,
+  onWorksiteChange,
+  onShiftNotesChange,
+  onShiftSubmit,
+  onShiftCancel,
+  showReportForm,
+  reportContent,
+  isSubmittingReport,
+  reports,
+  onToggleReportForm,
+  onReportContentChange,
+  onReportSubmit,
+  onReportCancel,
+}) => {
   if (isLoading) {
     return <Loading fullScreen />;
   }
@@ -248,7 +221,11 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
               nextAction && (
                 <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center">
-                    <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-5 h-5 text-blue-600 mr-2"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path
                         fillRule="evenodd"
                         d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -270,7 +247,16 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
           {/* 前日報告フォーム */}
           {activeAction === ActionType.PREVIOUS_DAY && (
             <div className="mb-6">
-              <PreviousDayForm onSuccess={onPreviousDaySuccess} />
+              <PreviousDayForm
+                formData={previousDayFormData}
+                onFormChange={onPreviousDayFormChange}
+                appearancePhoto={appearancePhoto}
+                onAppearancePhotoChange={onAppearancePhotoChange}
+                routePhoto={routePhoto}
+                onRoutePhotoChange={onRoutePhotoChange}
+                onSubmit={onPreviousDaySubmit}
+                isSubmitting={isPreviousDaySubmitting}
+              />
               <Button variant="outline" onClick={onCancelPreviousDay} className="w-full mt-3">
                 キャンセル
               </Button>
@@ -293,7 +279,9 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                       className="bg-primary-600 h-2 rounded-full transition-all"
                       style={{
                         width: `${
-                          (actionStatuses.filter((a) => a.completed).length / actionStatuses.length) * 100
+                          (actionStatuses.filter((a) => a.completed).length /
+                            actionStatuses.length) *
+                          100
                         }%`,
                       }}
                     />
@@ -307,21 +295,27 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
               {currentRecord.wakeUpTime && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-700">起床時刻</span>
-                  <span className="font-semibold">{formatDate(currentRecord.wakeUpTime, 'HH:mm')}</span>
+                  <span className="font-semibold">
+                    {formatDate(currentRecord.wakeUpTime, 'HH:mm')}
+                  </span>
                 </div>
               )}
 
               {currentRecord.departureTime && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-700">出発時刻</span>
-                  <span className="font-semibold">{formatDate(currentRecord.departureTime, 'HH:mm')}</span>
+                  <span className="font-semibold">
+                    {formatDate(currentRecord.departureTime, 'HH:mm')}
+                  </span>
                 </div>
               )}
 
               {currentRecord.arrivalTime && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-700">到着時刻</span>
-                  <span className="font-semibold">{formatDate(currentRecord.arrivalTime, 'HH:mm')}</span>
+                  <span className="font-semibold">
+                    {formatDate(currentRecord.arrivalTime, 'HH:mm')}
+                  </span>
                 </div>
               )}
             </div>
@@ -337,14 +331,18 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                     action.completed
                       ? 'border-green-300 bg-green-50'
                       : action.enabled
-                      ? 'border-primary-300 bg-primary-50 cursor-pointer hover:border-primary-400'
-                      : 'border-gray-200 bg-gray-50'
+                        ? 'border-primary-300 bg-primary-50 cursor-pointer hover:border-primary-400'
+                        : 'border-gray-200 bg-gray-50'
                   }`}
                   onClick={() => onActionClick(action)}
                 >
                   <div className="flex items-center space-x-3">
                     {action.completed ? (
-                      <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <svg
+                        className="w-6 h-6 text-green-600"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
                         <path
                           fillRule="evenodd"
                           d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -366,7 +364,11 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                         />
                       </svg>
                     ) : (
-                      <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <svg
+                        className="w-6 h-6 text-gray-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
                         <path
                           fillRule="evenodd"
                           d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
@@ -380,8 +382,8 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                           action.completed
                             ? 'text-green-800'
                             : action.enabled
-                            ? 'text-primary-800'
-                            : 'text-gray-500'
+                              ? 'text-primary-800'
+                              : 'text-gray-500'
                         }`}
                       >
                         {action.label}
@@ -391,8 +393,8 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                           action.completed
                             ? 'text-green-600'
                             : action.enabled
-                            ? 'text-primary-600'
-                            : 'text-gray-400'
+                              ? 'text-primary-600'
+                              : 'text-gray-400'
                         }`}
                       >
                         {action.description}
@@ -490,7 +492,12 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                   <Button type="submit" className="flex-1" isLoading={isSubmittingShift}>
                     登録
                   </Button>
-                  <Button type="button" variant="outline" onClick={onShiftCancel} className="flex-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onShiftCancel}
+                    className="flex-1"
+                  >
                     キャンセル
                   </Button>
                 </div>
@@ -552,7 +559,12 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                   <Button type="submit" className="flex-1" isLoading={isSubmittingReport}>
                     提出
                   </Button>
-                  <Button type="button" variant="outline" onClick={onReportCancel} className="flex-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onReportCancel}
+                    className="flex-1"
+                  >
                     キャンセル
                   </Button>
                 </div>
@@ -581,7 +593,9 @@ export const HomeView: React.FC<HomeViewProps> = (props) => {
                     </div>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{report.content}</p>
                     {report.submittedAt && (
-                      <p className="text-xs text-gray-500 mt-2">提出日時: {formatDate(report.submittedAt)}</p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        提出日時: {formatDate(report.submittedAt)}
+                      </p>
                     )}
                   </div>
                 ))
