@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Loading } from '@/components/common/Loading';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';

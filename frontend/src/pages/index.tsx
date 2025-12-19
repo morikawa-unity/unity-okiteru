@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Loading } from '@/components/common/Loading';
 import { ROUTES } from '@/lib/constants';
 import Link from 'next/link';
