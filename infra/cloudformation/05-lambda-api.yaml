@@ -11,15 +11,6 @@ Parameters:
       - development
     Description: Environment name
 
-  LambdaS3Bucket:
-    Type: String
-    Description: S3 bucket containing Lambda deployment package
-
-  LambdaS3Key:
-    Type: String
-    Default: lambda/okiteru-api-latest.zip
-    Description: S3 key for Lambda deployment package
-
   LambdaMemorySize:
     Type: Number
     Default: 512
@@ -90,10 +81,29 @@ Resources:
     Properties:
       FunctionName: !Sub ${EnvironmentName}-okiteru-api
       Runtime: python3.11
-      Handler: lambda_handler.handler
+      Handler: index.handler
       Code:
-        S3Bucket: !Ref LambdaS3Bucket
-        S3Key: !Ref LambdaS3Key
+        ZipFile: |
+          import json
+
+          def handler(event, context):
+              """
+              初期デプロイ用ダミーハンドラー
+              CodePipelineが実際のFastAPIコードで自動更新します
+              """
+              return {
+                  'statusCode': 200,
+                  'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*'
+                  },
+                  'body': json.dumps({
+                      'message': 'Okiteru API - Initial Deployment',
+                      'status': 'Ready for CodePipeline deployment',
+                      'version': '0.0.1-initial',
+                      'timestamp': context.aws_request_id
+                  })
+              }
       Role: !GetAtt LambdaExecutionRole.Arn
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref LambdaTimeout
@@ -185,9 +195,8 @@ Resources:
       RestApiId: !Ref RestApi
       ResourceId: !Ref ProxyResource
       HttpMethod: ANY
-      AuthorizationType: NONE
-      # AuthorizationType: COGNITO_USER_POOLS
-      # AuthorizerId: !Ref ApiAuthorizer
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
@@ -200,7 +209,7 @@ Resources:
       RestApiId: !Ref RestApi
       ResourceId: !GetAtt RestApi.RootResourceId
       HttpMethod: ANY
-      AuthorizationType: NONE
+      AuthorizationType: NONE # ルートは認証なしでヘルスチェック等に使用
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
@@ -239,6 +248,26 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*
+
+  # IAM Role for API Gateway CloudWatch Logs
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  # API Gateway Account (for CloudWatch Logs)
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
   # CloudWatch Log Group for API Gateway
   ApiGatewayLogGroup:
