@@ -1,15 +1,15 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CodePipeline for Okiteru - CI/CD Pipeline'
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Okiteru - CodePipeline CI/CD Layer"
 
 Parameters:
-  Environment:
+  EnvironmentName:
     Type: String
+    Default: production
     AllowedValues:
-      - dev
+      - production
       - staging
-      - prod
-    Description: デプロイ環境
-    Default: dev
+      - development
+    Description: Environment name
 
   GitHubOwner:
     Type: String
@@ -24,20 +24,19 @@ Parameters:
   GitHubBranch:
     Type: String
     Description: 監視するブランチ名
-    Default: develop
 
   GitHubToken:
     Type: String
     NoEcho: true
     Description: GitHub Personal Access Token (OAuth)
-    Default: '{{resolve:secretsmanager:github-token:SecretString:token}}'
+    Default: "{{resolve:secretsmanager:github-token:SecretString:token}}"
 
 Resources:
   # S3 Bucket for Pipeline Artifacts
   ArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub okiteru-pipeline-artifacts-${Environment}-${AWS::AccountId}
+      BucketName: !Sub okiteru-pipeline-artifacts-${EnvironmentName}-${AWS::AccountId}
       VersioningConfiguration:
         Status: Enabled
       LifecycleConfiguration:
@@ -50,13 +49,20 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-pipeline-artifacts
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: Okiteru
 
   # CodeBuild Project
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub okiteru-build-${Environment}
-      Description: !Sub Okiteru build project for ${Environment}
+      Name: !Sub okiteru-build-${EnvironmentName}
+      Description: !Sub Okiteru build project for ${EnvironmentName}
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -66,7 +72,7 @@ Resources:
         Image: aws/codebuild/standard:7.0
         EnvironmentVariables:
           - Name: ENV
-            Value: !Ref Environment
+            Value: !Ref EnvironmentName
           - Name: AWS_DEFAULT_REGION
             Value: !Ref AWS::Region
           - Name: AWS_ACCOUNT_ID
@@ -80,13 +86,20 @@ Resources:
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED
-          GroupName: !Sub /aws/codebuild/okiteru-${Environment}
+          GroupName: !Sub /aws/codebuild/okiteru-${EnvironmentName}
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-codebuild
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: Okiteru
 
   # CodePipeline
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Sub okiteru-pipeline-${Environment}
+      Name: !Sub okiteru-pipeline-${EnvironmentName}
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -100,13 +113,13 @@ Resources:
                 Category: Source
                 Owner: ThirdParty
                 Provider: GitHub
-                Version: '1'
+                Version: "1"
               Configuration:
                 Owner: !Ref GitHubOwner
                 Repo: !Ref GitHubRepo
                 Branch: !Ref GitHubBranch
                 OAuthToken: !Ref GitHubToken
-                PollForSourceChanges: false  # Webhookを使用
+                PollForSourceChanges: false # Webhookを使用
               OutputArtifacts:
                 - Name: SourceOutput
 
@@ -118,7 +131,7 @@ Resources:
                 Category: Build
                 Owner: AWS
                 Provider: CodeBuild
-                Version: '1'
+                Version: "1"
               Configuration:
                 ProjectName: !Ref CodeBuildProject
               InputArtifacts:
@@ -136,16 +149,23 @@ Resources:
                   Category: Approval
                   Owner: AWS
                   Provider: Manual
-                  Version: '1'
+                  Version: "1"
                 Configuration:
-                  CustomData: !Sub 'Please review and approve deployment to ${Environment}'
+                  CustomData: !Sub "Please review and approve deployment to ${EnvironmentName}"
           - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-pipeline
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: Okiteru
 
   # GitHub Webhook
   GitHubWebhook:
     Type: AWS::CodePipeline::Webhook
     Properties:
-      Name: !Sub okiteru-github-webhook-${Environment}
+      Name: !Sub okiteru-github-webhook-${EnvironmentName}
       Authentication: GITHUB_HMAC
       AuthenticationConfiguration:
         SecretToken: !Ref GitHubToken
@@ -161,9 +181,9 @@ Resources:
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub okiteru-codebuild-role-${Environment}
+      RoleName: !Sub okiteru-codebuild-role-${EnvironmentName}
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -174,9 +194,9 @@ Resources:
       Policies:
         - PolicyName: CodeBuildPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
-              # S3アクセス
+              # S3アクセス（Artifact Bucket）
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -186,24 +206,37 @@ Resources:
                 Resource:
                   - !Sub ${ArtifactBucket}/*
                   - !Sub ${ArtifactBucket}
-                  - !Sub arn:aws:s3:::okiteru-frontend-${Environment}/*
-                  - !Sub arn:aws:s3:::okiteru-frontend-${Environment}
 
-              # Lambda更新
+              # S3アクセス（Frontend Bucket - 他スタックから参照）
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:DeleteObject
+                  - s3:PutObjectAcl
+                Resource:
+                  - !Sub
+                    - "${BucketArn}/*"
+                    - BucketArn:
+                        Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-storage-FrontendBucketArn
+                  - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-storage-FrontendBucketArn
+
+              # Lambda更新（他スタックから参照）
               - Effect: Allow
                 Action:
                   - lambda:UpdateFunctionCode
                   - lambda:UpdateFunctionConfiguration
                   - lambda:GetFunction
                 Resource:
-                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:okiteru-api-${Environment}
+                  - Fn::ImportValue: !Sub ${EnvironmentName}-okiteru-lambda-api-LambdaFunctionArn
 
-              # CloudFront無効化
+              # CloudFront無効化（他スタックから参照）
               - Effect: Allow
                 Action:
                   - cloudfront:CreateInvalidation
                   - cloudfront:GetInvalidation
-                Resource: '*'
+                Resource: "*"
 
               # Parameter Store読み取り
               - Effect: Allow
@@ -211,22 +244,30 @@ Resources:
                   - ssm:GetParameter
                   - ssm:GetParameters
                 Resource:
-                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/okiteru/${Environment}/*
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/okiteru/${EnvironmentName}/*
 
               # Secrets Manager読み取り
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
                 Resource:
-                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:okiteru/${Environment}/*
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:okiteru/${EnvironmentName}/*
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:github-token*
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-codebuild-role
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: Okiteru
 
   # IAM Role for CodePipeline
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub okiteru-codepipeline-role-${Environment}
+      RoleName: !Sub okiteru-codepipeline-role-${EnvironmentName}
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -235,9 +276,9 @@ Resources:
       Policies:
         - PolicyName: CodePipelinePolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
-              # S3アクセス
+              # S3アクセス（Artifact Bucket）
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -254,19 +295,33 @@ Resources:
                   - codebuild:BatchGetBuilds
                 Resource:
                   - !GetAtt CodeBuildProject.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-codepipeline-role
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: Okiteru
 
   # SNS Topic for Pipeline Notifications
   PipelineNotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub okiteru-pipeline-notifications-${Environment}
+      TopicName: !Sub okiteru-pipeline-notifications-${EnvironmentName}
       DisplayName: Okiteru Pipeline Notifications
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-okiteru-pipeline-notifications
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: Okiteru
 
   # CloudWatch Event Rule for Pipeline State Changes
   PipelineEventRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub okiteru-pipeline-events-${Environment}
+      Name: !Sub okiteru-pipeline-events-${EnvironmentName}
       Description: Notify on pipeline state changes
       EventPattern:
         source:
@@ -285,7 +340,7 @@ Resources:
           Id: SNSTarget
 
 Conditions:
-  IsProdEnvironment: !Equals [!Ref Environment, prod]
+  IsProdEnvironment: !Equals [!Ref EnvironmentName, production]
 
 Outputs:
   PipelineName:
@@ -297,6 +352,8 @@ Outputs:
   PipelineUrl:
     Description: CodePipeline URL
     Value: !Sub https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${Pipeline}/view
+    Export:
+      Name: !Sub ${AWS::StackName}-PipelineUrl
 
   ArtifactBucketName:
     Description: S3 Bucket for Pipeline Artifacts
@@ -309,3 +366,9 @@ Outputs:
     Value: !Ref PipelineNotificationTopic
     Export:
       Name: !Sub ${AWS::StackName}-NotificationTopic
+
+  CodeBuildProjectName:
+    Description: CodeBuild Project Name
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub ${AWS::StackName}-CodeBuildProject

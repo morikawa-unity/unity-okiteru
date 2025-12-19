@@ -1,5 +1,5 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Okiteru - Lambda & API Gateway Layer'
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Okiteru - Lambda & API Gateway Layer"
 
 Parameters:
   EnvironmentName:
@@ -41,7 +41,7 @@ Resources:
     Properties:
       RoleName: !Sub ${EnvironmentName}-okiteru-lambda-role
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -52,7 +52,7 @@ Resources:
       Policies:
         - PolicyName: LambdaExecutionPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               # CloudWatch Logs
               - Effect: Allow
@@ -176,7 +176,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: '{proxy+}'
+      PathPart: "{proxy+}"
 
   # API Gateway Method (ANY)
   ProxyMethod:
@@ -224,7 +224,7 @@ Resources:
       DeploymentId: !Ref ApiDeployment
       MethodSettings:
         - ResourcePath: /*
-          HttpMethod: '*'
+          HttpMethod: "*"
           LoggingLevel: INFO
           DataTraceEnabled: true
           MetricsEnabled: true
@@ -252,7 +252,7 @@ Outputs:
     Description: Lambda Function ARN
     Value: !GetAtt ApiLambdaFunction.Arn
     Export:
-      Name: !Sub ${EnvironmentName}-okiteru-lambda-arn
+      Name: !Sub ${EnvironmentName}-okiteru-lambda-api-LambdaFunctionArn
 
   ApiLambdaFunctionName:
     Description: Lambda Function Name

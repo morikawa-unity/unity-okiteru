@@ -85,6 +85,7 @@ declare -a STACKS=(
     "04-storage:storage"
     "05-lambda-api:lambda-api"
     "06-cloudfront:cloudfront"
+    "07-codepipeline:codepipeline"
 )
 
 # スタックデプロイ関数
@@ -208,7 +209,7 @@ log_info "Next steps:"
 log_info "1. Run ./setup-parameters.sh --env ${ENVIRONMENT} to configure Parameter Store"
 log_info "2. Run ./init-database.sh --env ${ENVIRONMENT} to initialize the database"
 log_info "3. Run ./init-cognito.sh --env ${ENVIRONMENT} to create test users"
-log_info "4. Setup CI/CD with cd ../codepipeline && ./deploy-${ENVIRONMENT}.sh"
+log_info "4. Setup GitHub Personal Access Token in Secrets Manager for CI/CD"
 log_info "========================================="
 log_info ""
 log_info "Log file saved to: ${LOG_FILE}"

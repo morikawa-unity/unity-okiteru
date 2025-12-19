@@ -46,5 +46,17 @@
   {
     "ParameterKey": "ACMCertificateArn",
     "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "GitHubOwner",
+    "ParameterValue": "your-github-username"
+  },
+  {
+    "ParameterKey": "GitHubRepo",
+    "ParameterValue": "unity-okiteru"
+  },
+  {
+    "ParameterKey": "GitHubBranch",
+    "ParameterValue": "main"
   }
 ]

@@ -1,5 +1,5 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Okiteru - Storage Layer (S3 Buckets)'
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Okiteru - Storage Layer (S3 Buckets)"
 
 Parameters:
   EnvironmentName:
@@ -41,14 +41,14 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders:
-              - '*'
+              - "*"
             AllowedMethods:
               - GET
               - PUT
               - POST
               - DELETE
             AllowedOrigins:
-              - '*'
+              - "*"
             ExposedHeaders:
               - ETag
             MaxAge: 3000
@@ -178,7 +178,7 @@ Outputs:
     Description: S3 Bucket ARN for frontend
     Value: !GetAtt FrontendBucket.Arn
     Export:
-      Name: !Sub ${EnvironmentName}-okiteru-frontend-bucket-arn
+      Name: !Sub ${EnvironmentName}-okiteru-storage-FrontendBucketArn
 
   LambdaDeploymentBucketName:
     Description: S3 Bucket name for Lambda deployment
