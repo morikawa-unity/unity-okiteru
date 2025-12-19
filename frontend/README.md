@@ -41,14 +41,21 @@ npm run dev
 `.env.local` ファイルを作成して以下を設定:
 
 ```bash
-# API エンドポイント
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# API エンドポイント（CloudFront経由）
+NEXT_PUBLIC_API_URL=https://xxx.cloudfront.net/api
 
-# AWS Cognito（後で設定）
-# NEXT_PUBLIC_COGNITO_USER_POOL_ID=
-# NEXT_PUBLIC_COGNITO_CLIENT_ID=
-# NEXT_PUBLIC_COGNITO_REGION=ap-northeast-1
+# AWS Cognito
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxx
+NEXT_PUBLIC_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 画像保存用S3バケット
+NEXT_PUBLIC_PHOTOS_BUCKET_URL=https://okiteru-photos-dev.s3.ap-northeast-1.amazonaws.com
+
+# 環境
+NEXT_PUBLIC_ENVIRONMENT=dev
 ```
+
+> **開発環境の場合**: `infra/dev/setup-parameters.sh` を実行すると `.env.dev` が自動生成されます。
 
 ## スクリプト
 
@@ -77,24 +84,72 @@ frontend/
 │   ├── pages/              # Next.js Pages Router
 │   │   ├── _app.tsx        # アプリケーションルート
 │   │   ├── _document.tsx   # HTMLドキュメント
-│   │   ├── index.tsx       # トップページ
-│   │   ├── login.tsx       # ログイン
-│   │   └── dashboard/      # スタッフダッシュボード
-│   ├── components/         # 再利用可能コンポーネント
-│   │   ├── common/         # 共通UI（Button, Card等）
-│   │   └── layout/         # レイアウト（Header等）
+│   │   ├── index.tsx       # ホーム画面（勤怠・シフト・日報）
+│   │   └── login/          # ログイン
+│   │       └── index.tsx
+│   ├── components/         # UIコンポーネント（Presenter）
+│   │   ├── common/         # 共通UI（Button, Input等）
+│   │   ├── layout/         # レイアウト（Header, Footer等）
+│   │   ├── home/           # ホーム画面UI
+│   │   │   └── HomeView.tsx
+│   │   └── login/          # ログイン画面UI
+│   │       └── LoginForm.tsx
+│   ├── containers/         # ビジネスロジック（Container）
+│   │   ├── home/
+│   │   │   └── HomeContainer.ts
+│   │   └── login/
+│   │       └── LoginContainer.ts
 │   ├── contexts/           # React Context
 │   │   └── AuthContext.tsx # 認証状態管理
 │   ├── hooks/              # カスタムフック
+│   │   └── usePreviousDayReport.ts
 │   ├── lib/                # ライブラリ・ユーティリティ
-│   │   ├── api.ts          # APIクライアント
-│   │   ├── queryClient.ts  # TanStack Query設定
-│   │   └── constants.ts    # 定数定義
+│   │   ├── api.ts          # APIクライアント（Axios）
+│   │   ├── enums.ts        # Enum定義
+│   │   └── queryClient.ts  # TanStack Query設定
 │   ├── types/              # TypeScript型定義
+│   │   └── home.ts         # ホーム画面の型
 │   ├── utils/              # ユーティリティ関数
+│   │   ├── dateUtils.ts    # 日付処理
+│   │   └── validators.ts   # バリデーション
 │   └── styles/             # グローバルスタイル
+│       └── globals.css
 ├── public/                 # 静的ファイル
 └── package.json
+```
+
+### Container/Presenter パターン
+
+このプロジェクトでは、**Container/Presenter パターン**を採用しています：
+
+- **Container** (`containers/`)
+  - `.ts` ファイル（JSXなし）
+  - ビジネスロジック、状態管理、API呼び出し
+  - `React.createElement()` でPresenterを呼び出し
+
+- **Presenter** (`components/`)
+  - `.tsx` ファイル（JSXあり）
+  - UIの表示のみ
+  - propsを受け取り、イベントをコールバックで返す
+
+**例:**
+```typescript
+// containers/home/HomeContainer.ts
+export const HomeContainer: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<HomeTab>(HomeTab.ATTENDANCE);
+  // ビジネスロジック...
+
+  return React.createElement(HomeView, {
+    activeTab,
+    onTabChange: setActiveTab,
+    // ...props
+  });
+};
+
+// components/home/HomeView.tsx
+export const HomeView: React.FC<HomeViewProps> = (props) => {
+  return <div>...</div>;
+};
 ```
 
 ## 開発時の注意点
@@ -120,22 +175,45 @@ frontend/
 
 ### 実装済み
 
-✅ ログイン画面
-✅ トップページ
-✅ ヘッダーナビゲーション
-✅ 勤怠報告画面（UI のみ）
-✅ 認証Context（モック）
-✅ APIクライアント
+**認証:**
+- ✅ ログイン画面（Cognito統合準備完了）
+- ✅ AuthContext（認証状態管理）
+
+**ホーム画面:**
+- ✅ 勤怠報告（起床・出発・到着）UI
+- ✅ 前日報告フォーム UI
+- ✅ 出社可能日登録 UI
+- ✅ 日報管理 UI
+- ✅ タブナビゲーション
+
+**共通:**
+- ✅ ヘッダーナビゲーション
+- ✅ レイアウトコンポーネント
+- ✅ Container/Presenter パターン
+- ✅ TanStack Query セットアップ
+- ✅ Axios APIクライアント
+- ✅ Enum定義（ActionType, AttendanceStatus等）
 
 ### 未実装
 
-- 日報作成・一覧
-- 出社可能日登録
-- マネージャーダッシュボード
-- スタッフ管理
-- 現場マスタ管理
-- 実際のAPI連携
-- Cognito統合
+**バックエンド連携:**
+- ❌ 勤怠報告API連携
+- ❌ 前日報告API連携
+- ❌ 出社可能日API連携
+- ❌ 日報API連携
+- ❌ 画像アップロード（S3）
+
+**認証:**
+- ❌ Cognito実装（準備のみ完了）
+
+**マネージャー機能:**
+- ❌ マネージャーダッシュボード
+- ❌ スタッフ管理画面
+- ❌ 現場マスタ管理
+
+**その他:**
+- ❌ テスト（Unit/E2E）
+- ❌ エラーハンドリング改善
 
 ## ビルド & デプロイ
 

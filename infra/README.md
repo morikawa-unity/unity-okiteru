@@ -1,365 +1,260 @@
-# Okiteru - インフラストラクチャ構築ガイド
+# Okiteru - インフラストラクチャ
 
-このディレクトリには、OkiteruアプリケーションのAWSインフラストラクチャをCloudFormationで構築するためのテンプレートが含まれています。
+このディレクトリには、OkiteruアプリケーションのAWSインフラストラクチャを構築するためのCloudFormationテンプレートとスクリプトが含まれています。
 
-## 📋 目次
+## 📋 ディレクトリ構成
 
-- [前提条件](#前提条件)
-- [インフラストラクチャ構成](#インフラストラクチャ構成)
-- [デプロイ手順](#デプロイ手順)
-- [スタック削除手順](#スタック削除手順)
-- [トラブルシューティング](#トラブルシューティング)
+```
+infra/
+├── dev/                          # 開発環境
+│   ├── infrastructure.yml        # CloudFormationテンプレート
+│   ├── deploy.sh                 # インフラデプロイ
+│   ├── setup-parameters.sh       # Parameter Store設定
+│   ├── init-database.sh          # データベース初期化
+│   ├── init-cognito.sh           # テストユーザー作成
+│   ├── cleanup.sh                # 環境削除
+│   └── README.md                 # 詳細ガイド
+├── codepipeline/                 # CI/CD
+│   ├── pipeline.yml              # CodePipelineテンプレート
+│   ├── deploy-dev.sh             # Dev環境パイプライン
+│   ├── deploy-staging.sh         # Staging環境パイプライン
+│   ├── deploy-prod.sh            # Production環境パイプライン
+│   └── README.md                 # CI/CDガイド
+└── README.md                     # 本ファイル
+```
 
----
+## 🏗️ インフラストラクチャ構成
 
-## 前提条件
+### 環境別デプロイ
 
-### 必要なツール
+| 環境 | スタック名 | ブランチ | 承認 |
+|------|-----------|---------|------|
+| **Dev** | `okiteru-infrastructure-dev` | `develop` | 不要 |
+| **Staging** | `okiteru-infrastructure-staging` | `staging` | 不要 |
+| **Production** | `okiteru-infrastructure-prod` | `main` | **必要** |
+
+### 作成されるリソース
+
+単一のCloudFormationスタックで以下のリソースを構築：
+
+**ネットワーク:**
+- VPC (10.0.0.0/16)
+- Public Subnet × 2
+- Private Subnet × 2
+- Internet Gateway
+- Route Tables
+- Security Groups
+
+**データベース:**
+- RDS PostgreSQL 15.5
+- db.t3.micro (開発環境)
+- Private Subnet配置
+
+**認証:**
+- Cognito User Pool
+- Cognito User Pool Client
+- User Groups (staff/manager)
+
+**ストレージ:**
+- S3 Bucket (フロントエンド) - プライベート
+- S3 Bucket (画像) - パブリック
+
+**CDN/API:**
+- CloudFront Distribution
+- API Gateway REST API
+- Lambda Function (Python 3.11)
+
+**その他:**
+- IAM Roles
+- CloudWatch Logs
+
+## 🚀 クイックスタート
+
+### 開発環境のセットアップ
 
 ```bash
-# AWS CLI v2インストール確認
-aws --version
+# 1. 開発環境ディレクトリに移動
+cd infra/dev
 
-# 未インストールの場合
-# macOS
-brew install awscli
+# 2. スクリプトに実行権限付与
+chmod +x *.sh
 
-# Linux
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
+# 3. インフラデプロイ（15-20分）
+./deploy.sh
+
+# 4. Parameter Store設定（1分）
+./setup-parameters.sh
+
+# 5. データベース初期化（2-3分）
+./init-database.sh
+
+# 6. テストユーザー作成（1分）
+./init-cognito.sh
+
+# 7. CI/CDセットアップ
+cd ../codepipeline
+./deploy-dev.sh
 ```
 
-### AWS認証情報の設定
+詳細は各ディレクトリのREADMEを参照してください：
+- **[dev/README.md](dev/README.md)** - 開発環境の詳細セットアップガイド
+- **[codepipeline/README.md](codepipeline/README.md)** - CI/CD設定ガイド
 
-```bash
-aws configure
-# AWS Access Key ID: YOUR_ACCESS_KEY
-# AWS Secret Access Key: YOUR_SECRET_KEY
-# Default region name: ap-northeast-1
-# Default output format: json
-```
-
----
-
-## インフラストラクチャ構成
-
-### スタック構成
-
-| No. | スタック名 | 内容 | 依存関係 |
-|-----|-----------|------|---------|
-| 1 | `okiteru-network` | VPC、サブネット、セキュリティグループ | なし |
-| 2 | `okiteru-database` | RDS PostgreSQL | network |
-| 3 | `okiteru-cognito` | Cognito User Pool | なし |
-| 4 | `okiteru-storage` | S3バケット | なし |
-| 5 | `okiteru-lambda-api` | Lambda、API Gateway | network, database, cognito, storage |
-| 6 | `okiteru-cloudfront` | CloudFront Distribution | storage, lambda-api |
-
-### リソース概要
+## 📊 アーキテクチャ図
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        CloudFront                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Frontend   │  │     API      │  │    Photos    │     │
-│  │      S3      │  │   Gateway    │  │      S3      │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                    ┌─────────┴─────────┐
-                    │                   │
-            ┌───────▼────────┐  ┌──────▼──────┐
-            │     Lambda     │  │   Cognito   │
-            │   (FastAPI)    │  │  User Pool  │
-            └───────┬────────┘  └─────────────┘
-                    │
-                    │ VPC
-        ┌───────────┴───────────┐
-        │                       │
-   ┌────▼─────┐        ┌───────▼────────┐
-   │   RDS    │        │   Secrets      │
-   │PostgreSQL│        │   Manager      │
-   └──────────┘        └────────────────┘
+                    ユーザー (ブラウザ)
+                            ↓ HTTPS
+                  ┌──────────────────┐
+                  │   CloudFront     │
+                  │  (CDN / HTTPS)   │
+                  └────────┬─────────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+              ▼                         ▼
+      ┌─────────────┐          ┌──────────────┐
+      │  S3 Bucket  │          │ API Gateway  │
+      │ (Frontend)  │          │  (REST API)  │
+      │  (Private)  │          └──────┬───────┘
+      └─────────────┘                 │
+                                      ▼
+┌──────────────────────────────────────────────────────┐
+│ VPC (10.0.0.0/16)                                    │
+│                                                      │
+│  ┌──────────────┐  ┌──────────────┐                │
+│  │ Public       │  │ Public       │                │
+│  │ Subnet 1     │  │ Subnet 2     │                │
+│  └──────────────┘  └──────────────┘                │
+│         ↓                 ↓                         │
+│  ┌──────────────┐  ┌──────────────┐                │
+│  │ Private      │  │ Private      │                │
+│  │ Subnet 1     │  │ Subnet 2     │                │
+│  │              │  │              │                │
+│  │ [Lambda]     │  │ [RDS]        │                │
+│  │    ↓         │  │              │                │
+│  │ [Cognito]    │  │ [S3 Photos]  │                │
+│  └──────────────┘  └──────────────┘                │
+│                                                      │
+└──────────────────────────────────────────────────────┘
 ```
 
----
+## 💰 コスト見積もり
 
-## デプロイ手順
+### 開発環境（月額）
 
-### 1. パラメータファイルの編集
+| サービス | 仕様 | 月額（USD） |
+|---------|------|------------|
+| RDS (db.t3.micro) | 1インスタンス、20GB | $15-20 |
+| Lambda | 月100万リクエスト | $1-5 |
+| S3 | 1GB保存 | $1未満 |
+| CloudFront | 月10GB転送 | $1-3 |
+| API Gateway | 月100万リクエスト | $3-4 |
+| Cognito | 月1000 MAU以下 | 無料 |
+| **合計** | | **$25-35/月** |
 
-```bash
-cd infra/cloudformation
+### 本番環境（月額）
 
-# 本番環境
-cp parameters-production.json parameters-production-local.json
-vim parameters-production-local.json
-# DBPassword を変更してください
+| サービス | 仕様 | 月額（USD） |
+|---------|------|------------|
+| RDS (db.t4g.small) | 1インスタンス、100GB | $40-50 |
+| Lambda | 月1000万リクエスト | $10-20 |
+| S3 | 50GB保存 | $1-2 |
+| CloudFront | 月100GB転送 | $8-12 |
+| API Gateway | 月1000万リクエスト | $30-40 |
+| NAT Gateway | 1台（必要な場合） | $30-40 |
+| Cognito | 月10,000 MAU | 無料 |
+| **合計** | | **$120-200/月** |
 
-# ステージング環境
-cp parameters-staging.json parameters-staging-local.json
-vim parameters-staging-local.json
+## 🔧 主要スクリプト
+
+### インフラ管理
+
+| スクリプト | 用途 | 所要時間 |
+|-----------|------|---------|
+| `deploy.sh` | インフラデプロイ | 15-20分 |
+| `setup-parameters.sh` | 環境変数設定 | 1分 |
+| `init-database.sh` | DB初期化 | 2-3分 |
+| `init-cognito.sh` | テストユーザー作成 | 1分 |
+| `cleanup.sh` | 環境完全削除 | 10-15分 |
+
+### CI/CD管理
+
+| スクリプト | 用途 |
+|-----------|------|
+| `deploy-dev.sh` | Dev環境パイプライン |
+| `deploy-staging.sh` | Staging環境パイプライン |
+| `deploy-prod.sh` | Production環境パイプライン |
+
+## 📝 デプロイフロー
+
+```
+1. ローカル開発
+   ↓
+2. git push origin develop
+   ↓
+3. GitHub（ソース更新）
+   ↓ webhook（自動検知）
+4. CodePipeline（起動）
+   ↓
+5. CodeBuild（ビルド・テスト）
+   - Frontend: npm run build
+   - Backend: Lambda zip作成
+   ↓
+6. 自動デプロイ
+   - S3にフロントエンド
+   - CloudFront キャッシュ無効化
+   - Lambda コード更新
 ```
 
-**重要**: `*-local.json`ファイルは`.gitignore`に含まれています。
+## 🔒 セキュリティ
 
-### 2. スタックのデプロイ
+**認証情報の管理:**
+- GitHub Token: AWS Secrets Manager
+- Database認証情報: Parameter Store (SecureString)
+- Cognito設定: Parameter Store
 
-#### 方法1: 手動デプロイ（推奨：初回）
+**ネットワークセキュリティ:**
+- RDS: Private Subnet（外部アクセス不可）
+- Lambda: VPC内配置
+- S3 (Frontend): CloudFrontからのみアクセス
+- S3 (Photos): パブリック読み取り可能（書き込みはLambdaのみ）
 
-```bash
-# 環境変数設定
-ENV=production  # または staging
-REGION=ap-northeast-1
+**IAM権限:**
+- Lambda実行ロール: 最小権限の原則
+- CodeBuild: 必要なリソースへの限定的アクセス
 
-# 1. ネットワーク層
-aws cloudformation create-stack \
-  --stack-name ${ENV}-okiteru-network \
-  --template-body file://01-network.yaml \
-  --parameters file://parameters-${ENV}-local.json \
-  --region ${REGION}
+## 🆘 トラブルシューティング
 
-# スタック作成完了まで待機（約5分）
-aws cloudformation wait stack-create-complete \
-  --stack-name ${ENV}-okiteru-network \
-  --region ${REGION}
+デプロイ失敗時は以下を確認：
 
-# 2. ストレージ層（並列実行可）
-aws cloudformation create-stack \
-  --stack-name ${ENV}-okiteru-storage \
-  --template-body file://04-storage.yaml \
-  --parameters file://parameters-${ENV}-local.json \
-  --region ${REGION}
+1. **ログファイル確認**
+   ```bash
+   cat infra/dev/logs/deploy-*.log
+   ```
 
-# 3. 認証層（並列実行可）
-aws cloudformation create-stack \
-  --stack-name ${ENV}-okiteru-cognito \
-  --template-body file://03-cognito.yaml \
-  --parameters file://parameters-${ENV}-local.json \
-  --region ${REGION}
+2. **CloudFormationイベント確認**
+   ```bash
+   aws cloudformation describe-stack-events \
+     --stack-name okiteru-infrastructure-dev \
+     --max-items 20
+   ```
 
-# スタック作成完了まで待機
-aws cloudformation wait stack-create-complete \
-  --stack-name ${ENV}-okiteru-storage \
-  --region ${REGION}
+3. **完全クリーンアップ**
+   ```bash
+   cd infra/dev
+   ./cleanup.sh
+   ```
 
-aws cloudformation wait stack-create-complete \
-  --stack-name ${ENV}-okiteru-cognito \
-  --region ${REGION}
+詳細は [dev/README.md](dev/README.md) のトラブルシューティングセクションを参照。
 
-# 4. データベース層
-aws cloudformation create-stack \
-  --stack-name ${ENV}-okiteru-database \
-  --template-body file://02-database.yaml \
-  --parameters file://parameters-${ENV}-local.json \
-  --region ${REGION}
-
-# スタック作成完了まで待機（約10分）
-aws cloudformation wait stack-create-complete \
-  --stack-name ${ENV}-okiteru-database \
-  --region ${REGION}
-
-# 5. Lambda & API Gateway層
-# まず、Lambda デプロイパッケージをS3にアップロード
-cd ../../backend
-./scripts/package-lambda.sh  # Lambda パッケージング
-aws s3 cp lambda-deployment.zip s3://${ENV}-okiteru-lambda-deployment-$(aws sts get-caller-identity --query Account --output text)/lambda/okiteru-api-latest.zip
-
-cd ../infra/cloudformation
-
-aws cloudformation create-stack \
-  --stack-name ${ENV}-okiteru-lambda-api \
-  --template-body file://05-lambda-api.yaml \
-  --parameters file://parameters-${ENV}-local.json \
-    ParameterKey=LambdaS3Bucket,ParameterValue=${ENV}-okiteru-lambda-deployment-$(aws sts get-caller-identity --query Account --output text) \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region ${REGION}
-
-# スタック作成完了まで待機（約3分）
-aws cloudformation wait stack-create-complete \
-  --stack-name ${ENV}-okiteru-lambda-api \
-  --region ${REGION}
-
-# 6. CloudFront層
-aws cloudformation create-stack \
-  --stack-name ${ENV}-okiteru-cloudfront \
-  --template-body file://06-cloudfront.yaml \
-  --parameters file://parameters-${ENV}-local.json \
-  --region ${REGION}
-
-# スタック作成完了まで待機（約15分）
-aws cloudformation wait stack-create-complete \
-  --stack-name ${ENV}-okiteru-cloudfront \
-  --region ${REGION}
-```
-
-#### 方法2: デプロイスクリプト使用
-
-```bash
-# デプロイスクリプトを実行可能にする
-chmod +x scripts/deploy.sh
-
-# 本番環境デプロイ
-./scripts/deploy.sh production
-
-# ステージング環境デプロイ
-./scripts/deploy.sh staging
-```
-
-### 3. 出力値の確認
-
-```bash
-# API エンドポイント取得
-aws cloudformation describe-stacks \
-  --stack-name ${ENV}-okiteru-lambda-api \
-  --query 'Stacks[0].Outputs[?OutputKey==`RestApiUrl`].OutputValue' \
-  --output text
-
-# CloudFront URL取得
-aws cloudformation describe-stacks \
-  --stack-name ${ENV}-okiteru-cloudfront \
-  --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontUrl`].OutputValue' \
-  --output text
-
-# Cognito User Pool ID取得
-aws cloudformation describe-stacks \
-  --stack-name ${ENV}-okiteru-cognito \
-  --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' \
-  --output text
-```
-
-### 4. データベースマイグレーション
-
-```bash
-cd ../../backend
-
-# 環境変数設定（RDSエンドポイント取得）
-export DATABASE_URL="postgresql://okiteru_admin:YOUR_PASSWORD@RDS_ENDPOINT:5432/okiteru"
-
-# マイグレーション実行
-source venv/bin/activate
-alembic upgrade head
-
-# 初期データ投入
-python scripts/seed_data.py
-```
-
-### 5. フロントエンドデプロイ
-
-```bash
-cd ../frontend
-
-# ビルド
-npm run build
-
-# S3にアップロード
-aws s3 sync out/ s3://${ENV}-okiteru-frontend-$(aws sts get-caller-identity --query Account --output text)/ --delete
-
-# CloudFront キャッシュ無効化
-aws cloudfront create-invalidation \
-  --distribution-id $(aws cloudformation describe-stacks --stack-name ${ENV}-okiteru-cloudfront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' --output text) \
-  --paths "/*"
-```
-
----
-
-## スタック削除手順
-
-**⚠️ 警告**: この操作は元に戻せません。本番環境では慎重に実行してください。
-
-```bash
-ENV=production
-REGION=ap-northeast-1
-
-# 逆順で削除
-aws cloudformation delete-stack --stack-name ${ENV}-okiteru-cloudfront --region ${REGION}
-aws cloudformation wait stack-delete-complete --stack-name ${ENV}-okiteru-cloudfront --region ${REGION}
-
-aws cloudformation delete-stack --stack-name ${ENV}-okiteru-lambda-api --region ${REGION}
-aws cloudformation wait stack-delete-complete --stack-name ${ENV}-okiteru-lambda-api --region ${REGION}
-
-aws cloudformation delete-stack --stack-name ${ENV}-okiteru-database --region ${REGION}
-aws cloudformation wait stack-delete-complete --stack-name ${ENV}-okiteru-database --region ${REGION}
-
-aws cloudformation delete-stack --stack-name ${ENV}-okiteru-cognito --region ${REGION}
-aws cloudformation wait stack-delete-complete --stack-name ${ENV}-okiteru-cognito --region ${REGION}
-
-# S3バケットは手動で削除（バージョニング有効のため）
-aws s3 rm s3://${ENV}-okiteru-frontend-$(aws sts get-caller-identity --query Account --output text) --recursive
-aws s3 rb s3://${ENV}-okiteru-frontend-$(aws sts get-caller-identity --query Account --output text)
-
-aws s3 rm s3://${ENV}-okiteru-photos-$(aws sts get-caller-identity --query Account --output text) --recursive
-aws s3 rb s3://${ENV}-okiteru-photos-$(aws sts get-caller-identity --query Account --output text)
-
-aws cloudformation delete-stack --stack-name ${ENV}-okiteru-storage --region ${REGION}
-aws cloudformation wait stack-delete-complete --stack-name ${ENV}-okiteru-storage --region ${REGION}
-
-aws cloudformation delete-stack --stack-name ${ENV}-okiteru-network --region ${REGION}
-aws cloudformation wait stack-delete-complete --stack-name ${ENV}-okiteru-network --region ${REGION}
-```
-
----
-
-## トラブルシューティング
-
-### スタック作成失敗時
-
-```bash
-# エラー詳細確認
-aws cloudformation describe-stack-events \
-  --stack-name ${ENV}-okiteru-network \
-  --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`]' \
-  --output table
-```
-
-### Lambda デプロイエラー
-
-```bash
-# Lambda ログ確認
-aws logs tail /aws/lambda/${ENV}-okiteru-api --follow
-```
-
-### RDS接続エラー
-
-```bash
-# セキュリティグループ確認
-aws ec2 describe-security-groups \
-  --filters "Name=tag:Name,Values=${ENV}-okiteru-rds-sg"
-
-# RDS エンドポイント確認
-aws rds describe-db-instances \
-  --db-instance-identifier ${ENV}-okiteru-db \
-  --query 'DBInstances[0].Endpoint'
-```
-
----
-
-## コスト見積もり
-
-### 月額概算（東京リージョン）
-
-| サービス | インスタンス/容量 | 月額（USD） |
-|---------|-----------------|------------|
-| RDS PostgreSQL | db.t4g.small (20GB) | ~$30 |
-| Lambda | 1M requests/月 | ~$5 |
-| API Gateway | 1M requests/月 | ~$3.5 |
-| CloudFront | 100GB転送/月 | ~$8.5 |
-| S3 | 50GB保存 | ~$1.5 |
-| Cognito | 10,000 MAU | 無料 |
-| NAT Gateway | 1台 | ~$32 |
-| **合計** | | **~$80/月** |
-
-※ 実際のコストは利用量によって変動します。
-
----
-
-## 参考資料
+## 📚 参考リンク
 
 - [AWS CloudFormation ドキュメント](https://docs.aws.amazon.com/cloudformation/)
-- [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)
+- [AWS CodePipeline ドキュメント](https://docs.aws.amazon.com/codepipeline/)
 - [FastAPI on AWS Lambda](https://www.serverless.com/examples/aws-python-fastapi-api)
 
 ---
 
-**作成日**: 2025-12-18
-**バージョン**: 1.0
+**作成日**: 2025-12-19
+**更新日**: 2025-12-19

@@ -199,12 +199,50 @@ backend/
 │   ├── database.py           # SQLAlchemyセットアップ
 │   ├── dependencies.py       # 依存性注入
 │   ├── models/               # SQLAlchemyモデル
+│   │   ├── user.py
+│   │   ├── attendance.py
+│   │   ├── report.py
+│   │   └── ...
 │   ├── schemas/              # Pydanticスキーマ
+│   │   ├── user.py
+│   │   ├── attendance.py
+│   │   └── ...
 │   ├── repositories/         # データアクセス層
+│   │   └── ...
 │   ├── services/             # ビジネスロジック
-│   └── routers/              # APIエンドポイント
+│   │   └── ...
+│   ├── routers/              # APIエンドポイント
+│   │   ├── health.py
+│   │   ├── auth.py
+│   │   └── ...
+│   └── utils/                # ユーティリティ
+│       ├── s3.py             # S3操作
+│       ├── cognito.py        # Cognito操作
+│       └── ...
+├── scripts/                  # 初期化スクリプト等
 ├── tests/                    # テストコード
 ├── alembic.ini               # Alembic設定
-├── requirements.txt          # 依存パッケージ
+├── requirements.txt          # 依存パッケージ（本番）
+├── requirements-dev.txt      # 依存パッケージ（開発）
+├── docker-compose.yml        # PostgreSQLコンテナ
 └── .env                      # 環境変数
 ```
+
+### レイヤードアーキテクチャ
+
+```
+Router Layer (routers/)
+  ↓ HTTPリクエスト処理、認証、バリデーション
+Service Layer (services/)
+  ↓ ビジネスロジック、複数リポジトリの調整
+Repository Layer (repositories/)
+  ↓ データアクセス、CRUD操作
+Model Layer (models/)
+  ↓ SQLAlchemyモデル定義
+```
+
+**重要な原則:**
+- **Router**: HTTPリクエスト/レスポンス処理のみ
+- **Service**: 複雑なビジネスロジック、複数テーブルにまたがる処理
+- **Repository**: データベースCRUD操作、クエリ構築
+- **Model**: テーブル定義、リレーション定義

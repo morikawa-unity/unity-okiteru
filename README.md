@@ -133,17 +133,32 @@
 unity-okiteru/
 ├── README.md                     # 本ファイル
 ├── CLAUDE.md                     # Claude Code向けガイド
+├── TODO.md                       # タスク管理
 ├── docs/                         # ドキュメント
 │   ├── ARCHITECTURE.md           # アーキテクチャ設計書
 │   ├── DATABASE_DESIGN.md        # DB設計書
 │   ├── PROJECT_STRUCTURE.md      # プロジェクト構成
 │   └── REQUIREMENTS.md           # 要件定義書
-├── infrastructure/               # インフラコード（CloudFormation）
+├── infra/                        # インフラコード（CloudFormation）
+│   ├── dev/                      # 開発環境
+│   │   ├── infrastructure.yml    # インフラスタック
+│   │   ├── deploy.sh             # デプロイスクリプト
+│   │   ├── setup-parameters.sh   # Parameter Store設定
+│   │   ├── init-database.sh      # DB初期化
+│   │   ├── init-cognito.sh       # テストユーザー作成
+│   │   ├── cleanup.sh            # 環境削除
+│   │   └── README.md             # 開発環境セットアップガイド
+│   └── codepipeline/             # CI/CD（CodePipeline）
+│       ├── pipeline.yml
+│       └── README.md
 ├── frontend/                     # フロントエンドアプリケーション（Next.js）
-└── backend/                      # バックエンドアプリケーション（FastAPI）
+│   └── README.md                 # フロントエンド詳細
+├── backend/                      # バックエンドアプリケーション（FastAPI）
+│   └── README.md                 # バックエンド詳細
+└── buildspec.yml                 # CodeBuild設定
 ```
 
-詳細は [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) を参照。
+詳細は各ディレクトリのREADMEを参照してください。
 
 ---
 
